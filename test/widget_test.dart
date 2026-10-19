@@ -35,7 +35,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pump();
-    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Live nudges'), findsOneWidget);
     await tester.runAsync(() => services.db.close());
   });
 }

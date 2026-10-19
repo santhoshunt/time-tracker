@@ -12,6 +12,7 @@ import 'screens/plan_screen.dart';
 import 'screens/review_v3_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/today_screen.dart';
+import 'screens/usage_screen.dart';
 // Also keeps backgroundMain, the headless engine's entry point, in the AOT
 // build: without an import from main.dart's tree it would be dropped.
 import 'background.dart';
@@ -100,7 +101,7 @@ class _SetupGateState extends State<_SetupGate> {
   }
 }
 
-/// The four bottom tabs: Today, Plan, Review, Settings. Reads new usage
+/// The five bottom tabs: Today, Plan, Review, Usage, Settings. Reads new usage
 /// and checks for updates on start and every time the app comes back.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -251,6 +252,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             firstWeekday: context.watch<SettingsProvider>().firstWeekday,
             openDay: _openReviewDay,
           ),
+          const UsageScreen(),
           SettingsScreen(daysLoader: (first, last) => loadDays(_services, first, last)),
         ],
       ),
@@ -280,6 +282,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Review',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.donut_large_outlined),
+            selectedIcon: Icon(Icons.donut_large),
+            label: 'Usage',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),

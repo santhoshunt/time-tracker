@@ -7,12 +7,14 @@ import '../domain/models.dart';
 import '../painters/day_ring_painter.dart';
 import '../providers/settings_provider.dart';
 import '../services/day_loader.dart';
+import '../services/streak_loader.dart';
 import '../theme/drift_theme.dart';
 import '../theme/theme_id.dart';
 import '../widgets/score_card.dart';
 import '../widgets/timeline_lanes.dart';
 import '../widgets/update_banner.dart';
 import '../widgets/verdict_style.dart';
+import '../widgets/week_card.dart';
 
 /// The Today tab: the plan with real app use over it, as two lanes or a
 /// 24-hour ring (the Lanes / Ring control in the header). Reloads whenever
@@ -30,25 +32,49 @@ class TodayScreen extends StatefulWidget {
 
 class _TodayScreenState extends State<TodayScreen> {
   DayData? _data;
+  WeekProgress? _week;
   late final AppServices _services;
+  late final SettingsProvider _settings;
+  int? _firstWeekday;
 
   @override
   void initState() {
     super.initState();
     _services = context.read<AppServices>();
+    _settings = context.read<SettingsProvider>();
+    _firstWeekday = _settings.firstWeekday;
     _services.revision.addListener(_reload);
+    _settings.addListener(_onSettings);
     _reload();
   }
 
   @override
   void dispose() {
     _services.revision.removeListener(_reload);
+    _settings.removeListener(_onSettings);
     super.dispose();
   }
 
+  /// A new week start moves the week card's days.
+  void _onSettings() {
+    if (_settings.firstWeekday == _firstWeekday) return;
+    _firstWeekday = _settings.firstWeekday;
+    _reload();
+  }
+
+  /// The day first, so the score card never waits for the streak, which
+  /// can read months of history.
   Future<void> _reload() async {
-    final data = await loadDay(_services, _services.clock.now());
-    if (mounted) setState(() => _data = data);
+    final now = _services.clock.now();
+    final data = await loadDay(_services, now);
+    if (!mounted) return;
+    setState(() => _data = data);
+    final week = await loadWeekProgress(
+      _services,
+      now,
+      firstWeekday: _settings.firstWeekday,
+    );
+    if (mounted) setState(() => _week = week);
   }
 
   void _showSegment(Segment s) {
@@ -102,12 +128,20 @@ class _TodayScreenState extends State<TodayScreen> {
       ),
     );
 
+    final week = _week;
+    final now = _services.clock.now();
     final top = Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         children: [
           const UpdateBanner(),
           ScoreCard(score: data?.score, onPlan: widget.onPlan),
+          if (week != null && week.hasPlan)
+            WeekCard(
+              progress: week,
+              target: settings.weeklyTarget,
+              today: DateTime(now.year, now.month, now.day),
+            ),
         ],
       ),
     );

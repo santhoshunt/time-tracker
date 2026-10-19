@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../app_services.dart';
 import '../domain/models.dart';
 import '../domain/plan_resolver.dart';
+import '../domain/plan_suggest.dart';
 import '../providers/settings_provider.dart';
 import '../theme/drift_theme.dart';
 import '../widgets/plan_timeline.dart';
@@ -58,6 +59,14 @@ class _PlanScreenState extends State<PlanScreen> {
   /// True while a week action is writing, so a second tap waits its turn.
   bool _busy = false;
 
+  /// Frozen plans of the last five weeks, which ghost-block suggestions
+  /// read for past weekdays.
+  Map<String, String> _frozen = const {};
+
+  /// Dates whose suggestions were hidden with "Hide suggestions". Kept in
+  /// memory only, so they come back the next time the app starts.
+  final _hiddenSuggestions = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -78,12 +87,43 @@ class _PlanScreenState extends State<PlanScreen> {
   Future<void> _load() async {
     final all = await _services.plans.allBlocks();
     final templates = await _services.plans.allTemplates();
+    final today = _today;
+    final frozen = await _services.plans.frozenPlansBetween(
+      DateTime(today.year, today.month, today.day - 7 * (suggestWeeks + 1)),
+      DateTime(today.year, today.month, today.day + 1),
+    );
     if (!mounted) return;
     setState(() {
       _all = all;
       _templates = templates;
+      _frozen = frozen;
     });
   }
+
+  /// Ghost blocks for the selected day: only on an empty day from today
+  /// on (a past day's one-offs are history edits), and not once hidden.
+  List<PlanBlock> get _suggestions {
+    if (_date.isBefore(_today) || _dayBlocks.isNotEmpty) return const [];
+    if (_hiddenSuggestions.contains(dateKey(_date))) return const [];
+    return suggestPlan(_date, _all, _frozen);
+  }
+
+  Future<void> _keepSuggestions(List<PlanBlock> blocks) => _guarded(() async {
+    if (blocks.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    await _applyEdit(
+      messenger,
+      remove: const [],
+      add: blocks,
+      message: blocks.length == 1
+          ? 'Added ${blocks.single.name}'
+          : 'Added ${blocks.length} suggested blocks',
+      icon: Icons.add,
+    );
+  });
+
+  void _hideSuggestions() =>
+      setState(() => _hiddenSuggestions.add(dateKey(_date)));
 
   DateTime get _today => localDayStart(_services.clock.now());
 
@@ -591,14 +631,17 @@ class _PlanScreenState extends State<PlanScreen> {
     } else {
       final blocks = _dayBlocks;
       final hintStart = _suggestedStart(blocks, isToday);
+      final suggestions = _suggestions;
       body = [
         _header(context, today, isToday, null, firstWeekday),
         _dateStrip(context, today),
-        _chips(context),
+        _chips(context, suggestions),
         Divider(height: 1, color: c.line),
         Expanded(
           child: PlanTimeline(
             blocks: blocks,
+            suggestions: suggestions,
+            onKeepSuggestion: (b) => _keepSuggestions([b]),
             nowMinute: isToday ? nowMinute : null,
             hint: hintStart == null
                 ? null
@@ -896,12 +939,26 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _chips(BuildContext context) {
+  Widget _chips(BuildContext context, List<PlanBlock> suggestions) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
       child: Row(
         children: [
+          if (suggestions.isNotEmpty) ...[
+            _PlanChip(
+              icon: Icons.done_all,
+              label: 'Keep all',
+              onPressed: () => _keepSuggestions(suggestions),
+            ),
+            const SizedBox(width: 8),
+            _PlanChip(
+              icon: Icons.visibility_off_outlined,
+              label: 'Hide suggestions',
+              onPressed: _hideSuggestions,
+            ),
+            const SizedBox(width: 8),
+          ],
           for (final t in _templates) ...[
             GestureDetector(
               onLongPress: () => _deleteTemplate(t),

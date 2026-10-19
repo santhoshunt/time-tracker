@@ -50,6 +50,8 @@ const backupSettingKeys = <String, PrefType>{
   'week_start_v1': PrefType.string,
   'summary_enabled_v1': PrefType.boolean,
   'summary_minute_v1': PrefType.integer,
+  'focus_lock_v1': PrefType.boolean,
+  'weekly_target_v1': PrefType.integer,
 };
 
 /// How a setting is stored in SharedPreferences.

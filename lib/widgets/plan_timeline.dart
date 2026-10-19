@@ -67,9 +67,17 @@ class PlanTimeline extends StatefulWidget {
     this.onHintTap,
     this.initialMinute = 6 * 60,
     this.bottomPadding = 0,
+    this.suggestions = const [],
+    this.onKeepSuggestion,
   });
 
   final List<PlanBlock> blocks;
+
+  /// Blocks Drift suggests from past weeks, drawn dashed and faded under
+  /// the real ones; a tap goes to [onKeepSuggestion]. While any show, the
+  /// "Drag to add a block" hint does not.
+  final List<PlanBlock> suggestions;
+  final ValueChanged<PlanBlock>? onKeepSuggestion;
 
   /// Minute of the day for the "now" line, or null on other days.
   final int? nowMinute;
@@ -238,7 +246,22 @@ class _PlanTimelineState extends State<PlanTimeline> {
                       ),
                     ),
                   ),
-                  if (hint != null && draft == null)
+                  for (final g in widget.suggestions)
+                    if (g.endMin > g.startMin)
+                      Positioned(
+                        left: left,
+                        width: width,
+                        top: PlanTimeline.offsetOf(g.startMin) + 1,
+                        height: _span(g.startMin, g.endMin) - 2,
+                        child: GhostBlockTile(
+                          block: g,
+                          color: blockColor(context, g.colorIdx),
+                          onTap: widget.onKeepSuggestion == null
+                              ? null
+                              : () => widget.onKeepSuggestion!(g),
+                        ),
+                      ),
+                  if (hint != null && draft == null && widget.suggestions.isEmpty)
                     Positioned(
                       left: left,
                       width: width,
@@ -480,6 +503,89 @@ class PlanBlockTile extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A suggested block (plan from history, option B): a dashed outline in
+/// the block's colour, the name and range in secondary text, and a + to
+/// keep it. Shorter blocks drop the range, then the words, as
+/// [PlanBlockTile] does.
+class GhostBlockTile extends StatelessWidget {
+  const GhostBlockTile({
+    super.key,
+    required this.block,
+    required this.color,
+    this.onTap,
+  });
+
+  final PlanBlock block;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.drift;
+    final text = Theme.of(context).textTheme;
+    final scaler = MediaQuery.textScalerOf(context);
+    final nameStyle = text.titleSmall!.copyWith(
+      color: c.textSecondary,
+      fontWeight: FontWeight.w500,
+    );
+    final timeStyle = text.bodySmall!.copyWith(color: c.textSecondary);
+    final nameHeight = scaler.scale(14) * 20 / 14;
+    final timeHeight = scaler.scale(12) * 16 / 12;
+    final range = formatRange(block.startMin, block.endMin);
+    return Semantics(
+      button: onTap != null,
+      label: 'Suggested: ${block.name}, $range. Add it',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: CustomPaint(
+          painter: _DashedBorderPainter(color: color.withValues(alpha: 0.6)),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final h = box.maxHeight;
+              final plus = Icon(Icons.add, size: 18, color: c.textSecondary);
+              if (h >= nameHeight + timeHeight + 12) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 5, 8, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(block.name, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(range, style: timeStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                      plus,
+                    ],
+                  ),
+                );
+              }
+              if (h >= nameHeight + 2) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(block.name, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      plus,
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ),
       ),

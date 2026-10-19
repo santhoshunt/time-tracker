@@ -32,6 +32,7 @@ void main() {
         NavigationDestination(icon: Icon(Icons.schedule_outlined), label: 'Today'),
         NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: 'Plan'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), label: 'Review'),
+        NavigationDestination(icon: Icon(Icons.donut_large_outlined), label: 'Usage'),
         NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
       ],
     ),

@@ -26,6 +26,11 @@ class SettingsProvider extends ChangeNotifier {
   static const _kSummaryMinute = 'summary_minute_v1';
   static const _kLastUpdateVersion = 'update_last_success_version_v1';
   static const _kLastUpdateMs = 'update_last_success_ms_v1';
+  static const _kFocusLock = 'focus_lock_v1';
+  static const _kWeeklyTarget = 'weekly_target_v1';
+
+  /// The weekly target when none is saved: the week's score Sandy aims at.
+  static const defaultWeeklyTarget = 80;
 
   ThemeId _theme = ThemeId.mono;
   TodayView _todayView = TodayView.lanes;
@@ -44,8 +49,17 @@ class SettingsProvider extends ChangeNotifier {
   int _firstWeekday = DateTime.monday;
   bool _summaryEnabled = true;
   int _summaryMinute = 21 * 60 + 30;
+  bool _focusLock = false;
+  int _weeklyTarget = defaultWeeklyTarget;
 
   ThemeId get theme => _theme;
+
+  /// Focus lock: apps marked off track for a block are locked during it
+  /// instead of nudged. Off by default; it is the stronger tool.
+  bool get focusLock => _focusLock;
+
+  /// The week's score to aim for, 50 to 100, or 0 when the target is off.
+  int get weeklyTarget => _weeklyTarget;
 
   /// The evening summary notification, on by default (Sandy asked for both
   /// live nudges and an end-of-day review).
@@ -136,7 +150,29 @@ class SettingsProvider extends ChangeNotifier {
       () => (prefs.getInt(_kSummaryMinute) ?? 21 * 60 + 30).clamp(0, 1439),
       21 * 60 + 30,
     );
+    _focusLock = _read(() => prefs.getBool(_kFocusLock) ?? false, false);
+    _weeklyTarget = _read(
+      () => _clampTarget(prefs.getInt(_kWeeklyTarget) ?? defaultWeeklyTarget),
+      defaultWeeklyTarget,
+    );
     notifyListeners();
+  }
+
+  static int _clampTarget(int v) => v <= 0 ? 0 : v.clamp(50, 100);
+
+  Future<void> setFocusLock(bool value) async {
+    if (value == _focusLock) return;
+    _focusLock = value;
+    notifyListeners();
+    await _persist(_kFocusLock, (p) => p.setBool(_kFocusLock, value));
+  }
+
+  Future<void> setWeeklyTarget(int percent) async {
+    final value = _clampTarget(percent);
+    if (value == _weeklyTarget) return;
+    _weeklyTarget = value;
+    notifyListeners();
+    await _persist(_kWeeklyTarget, (p) => p.setInt(_kWeeklyTarget, value));
   }
 
   Future<void> setSummaryEnabled(bool value) async {

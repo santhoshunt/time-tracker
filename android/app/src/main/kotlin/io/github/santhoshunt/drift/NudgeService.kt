@@ -50,6 +50,10 @@ class NudgeService : Service() {
         const val NUDGE_NOTIFICATION_ID = 1802
         private const val SERVICE_NOTIFICATION_ID = 1801
         private const val TICK_MS = 60_000L
+
+        /** With focus lock on, an app has to be caught within seconds of
+         * opening, not a minute later. */
+        private const val LOCK_TICK_MS = 10_000L
         private const val LOOKBACK_MS = 3L * 60 * 60 * 1000
         private const val SNOOZE_MS = 5L * 60 * 1000
         private const val SYSTEM_UI = "com.android.systemui"
@@ -119,7 +123,8 @@ class NudgeService : Service() {
             } catch (e: Exception) {
                 recordError(this@NudgeService, e)
             }
-            ticker.postDelayed(this, TICK_MS)
+            val snap = snapshot
+            ticker.postDelayed(this, if (snap != null && snap.enabled && snap.lock) LOCK_TICK_MS else TICK_MS)
         }
     }
 
@@ -197,10 +202,16 @@ class NudgeService : Service() {
             snoozes[run.pkg],
         )
         if (decision !is NudgeDecision.Nudge) return
+        // A lock fires on every tick while the app stays in front; one card
+        // or one notification is enough, so neither is redrawn or reposted,
+        // and the 10-second ticks leave prefs alone.
+        if (decision.lock && (NudgeOverlay.showingFor == run.pkg || notifiedPkg == run.pkg)) return
 
         snoozeEnds.remove(run.pkg)
-        lastNudgeMs = now
-        prefs.edit().putLong(KEY_LAST_NUDGE, now).apply()
+        if (!decision.lock) {
+            lastNudgeMs = now
+            prefs.edit().putLong(KEY_LAST_NUDGE, now).apply()
+        }
         val label = info?.loadLabel(packageManager)?.toString() ?: run.pkg
         if (Settings.canDrawOverlays(this)) {
             val colors = snap.colors
@@ -353,7 +364,8 @@ class NudgeService : Service() {
         )
         val notification = NotificationCompat.Builder(this, NUDGE_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_drift)
-            .setContentTitle("Off track: ${nudge.block}")
+            .setContentTitle(if (nudge.lock) "Locked: ${nudge.block}" else "Off track: ${nudge.block}")
+            .setOnlyAlertOnce(true)
             .setContentText(NudgeOverlay.body(label, nudge))
             .setStyle(NotificationCompat.BigTextStyle().bigText(NudgeOverlay.body(label, nudge)))
             .setContentIntent(openAppIntent())

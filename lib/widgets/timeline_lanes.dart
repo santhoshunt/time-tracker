@@ -109,7 +109,9 @@ class _TimelineLanesState extends State<TimelineLanes> {
   LaneLayout? _layout;
   Object? _layoutKey;
 
-  static const _gutter = 46.0;
+  /// The hour gutter at normal text size; it widens with large text so
+  /// "12:00" stays on one line.
+  static const _minGutter = 46.0;
   static const _laneWidth = 76.0;
 
   /// The view starts at 06:00, or earlier when something happened before.
@@ -213,6 +215,14 @@ class _TimelineLanesState extends State<TimelineLanes> {
       base = base.merge(const TextStyle(fontWeight: FontWeight.bold));
     }
     final labelSmall = base.merge(text.labelSmall);
+    final hourStyle = labelSmall.copyWith(color: c.textSecondary);
+    // DayGridPainter lays hour labels out in gutter - 8.
+    final hourWidth = (TextPainter(
+      text: TextSpan(text: '00:00', style: hourStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+    )..layout()).width;
+    final gutter = math.max(_minGutter, hourWidth.ceilToDouble() + 10);
     final start = _start;
     final height = (24 - start) * widget.hourHeight;
     final now = widget.data.now;
@@ -235,16 +245,16 @@ class _TimelineLanesState extends State<TimelineLanes> {
             painter: DayGridPainter(
               startHour: start,
               hourHeight: widget.hourHeight,
-              gutter: _gutter,
+              gutter: gutter,
               blocks: blocks,
               lineColor: c.line.withValues(alpha: 0.6),
               planFill: c.planFill,
               planBorder: c.planBorder,
-              hourStyle: labelSmall.copyWith(color: c.textSecondary),
+              hourStyle: hourStyle,
               textScaler: scaler,
             ),
             foregroundPainter: showNow
-                ? NowLinePainter(y: _y(now), gutter: _gutter, color: c.offTrack)
+                ? NowLinePainter(y: _y(now), gutter: gutter, color: c.offTrack)
                 : null,
             child: Stack(
               clipBehavior: Clip.none,
@@ -252,7 +262,7 @@ class _TimelineLanesState extends State<TimelineLanes> {
                 // Inside the 1 px border, then padded 10, 4, lane width, 4.
                 for (var i = 0; i < blocks.length; i++)
                   Positioned(
-                    left: _gutter + 4 + 1 + 10,
+                    left: gutter + 4 + 1 + 10,
                     right: _laneWidth + 1,
                     top: blocks[i].$1 + 1 + 4,
                     height: blocks[i].$2 - 2 - 8,

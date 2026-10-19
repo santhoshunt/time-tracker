@@ -39,6 +39,7 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
     repeatMin: settings.nudgeRepeatMin,
     quietStartMin: settings.quietStartMin,
     quietEndMin: settings.quietEndMin,
+    lock: settings.focusLock,
     windows: nudgeWindows(
       blocks: blocks,
       rules: await s.rules.allRules(),

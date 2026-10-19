@@ -284,6 +284,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     onTap: _pickQuietHours,
                   ),
+                  SettingsRow(
+                    title: 'Lock instead of nudge',
+                    subtitle:
+                        'Apps you marked off track lock in every block. Hold '
+                        '3 seconds to open one for 5 minutes.',
+                    onTap: () => settings.setFocusLock(!settings.focusLock),
+                    trailing: Switch(
+                      value: settings.focusLock,
+                      onChanged: settings.setFocusLock,
+                    ),
+                  ),
                 ],
                 SettingsRow(
                   title: 'Evening summary',
@@ -316,6 +327,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: icon?.label,
                   leading: icon == null ? null : DriftIconTile(icon, 28),
                   onTap: () => _open(const IconPickerScreen()),
+                ),
+              ],
+            ),
+            SettingsGroup(
+              title: 'Goals',
+              children: [
+                SettingsRow(
+                  title: 'Weekly target',
+                  value: settings.weeklyTarget == 0
+                      ? 'Off'
+                      : '${settings.weeklyTarget}%',
+                  onTap: () => _pickMinutes(
+                    title: 'Weekly target',
+                    help:
+                        "The share of the week's planned time you want on "
+                        'track. Today and Review show how close you are.',
+                    options: const [0, 60, 70, 75, 80, 85, 90],
+                    current: settings.weeklyTarget,
+                    label: (p) => p == 0 ? 'Off' : '$p%',
+                    onPicked: settings.setWeeklyTarget,
+                  ),
                 ),
               ],
             ),

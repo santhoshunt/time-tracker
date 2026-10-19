@@ -56,6 +56,7 @@ class NudgeSnapshot {
     required this.windows,
     this.guessOffCategories = guess.guessOffCategories,
     this.colors = const {},
+    this.lock = false,
   });
 
   final int writtenAtMs;
@@ -69,6 +70,11 @@ class NudgeSnapshot {
 
   /// The theme's colours as "#RRGGBB", so the overlay matches the app.
   final Map<String, String> colors;
+
+  /// Focus lock: an app ruled off track for the block is locked at once
+  /// instead of nudged after a wait. Written without bumping `v`, and
+  /// read as false when absent, so older and newer builds agree.
+  final bool lock;
 
   /// A snapshot this old is ignored: the plan in it may no longer be the
   /// plan, and a wrong nudge is worse than none.
@@ -85,6 +91,7 @@ class NudgeSnapshot {
     'guessOffCategories': guessOffCategories.toList()..sort(),
     'windows': [for (final w in windows) w.toJson()],
     'colors': colors,
+    'lock': lock,
   };
 
   factory NudgeSnapshot.fromJson(Map<String, dynamic> j) => NudgeSnapshot(
@@ -106,6 +113,7 @@ class NudgeSnapshot {
       for (final e in (j['colors'] as Map<String, dynamic>? ?? const {}).entries)
         e.key: e.value as String,
     },
+    lock: j['lock'] as bool? ?? false,
   );
 }
 
@@ -123,11 +131,15 @@ class Nudge extends NudgeDecision {
     required this.block,
     required this.minutesOff,
     required this.minutesLeft,
+    this.lock = false,
   });
 
   final String block;
   final int minutesOff;
   final int minutesLeft;
+
+  /// Show the lock card (hold to open) instead of the nudge.
+  final bool lock;
 }
 
 /// Whether to nudge now. The same rule as NudgeDecider.kt, checked
@@ -159,12 +171,18 @@ NudgeDecision decideNudge(
   }
   if (window == null) return const NoNudge();
   if (window.anyApp || window.on.contains(pkg)) return const NoNudge();
-  final off =
-      window.off.contains(pkg) || s.guessOffCategories.contains(category);
+  final ruledOff = window.off.contains(pkg);
+  final off = ruledOff || s.guessOffCategories.contains(category);
   if (!off) return const NoNudge();
-  if (continuousMs < s.nudgeAfterMin * 60000) return const NoNudge();
-  if (lastNudgeMs != null && nowMs - lastNudgeMs < s.repeatMin * 60000) {
-    return const NoNudge();
+  // Only an app the user ruled off locks. A guess from the category alone
+  // could lock a messaging app nobody was asked about, so it keeps the
+  // nudge and both waits.
+  final lock = s.lock && ruledOff;
+  if (!lock) {
+    if (continuousMs < s.nudgeAfterMin * 60000) return const NoNudge();
+    if (lastNudgeMs != null && nowMs - lastNudgeMs < s.repeatMin * 60000) {
+      return const NoNudge();
+    }
   }
   if (snoozedUntilMs != null && snoozedUntilMs > nowMs) {
     return const NoNudge();
@@ -173,6 +191,7 @@ NudgeDecision decideNudge(
     block: window.block,
     minutesOff: continuousMs ~/ 60000,
     minutesLeft: ((window.endMs - nowMs) / 60000).ceil(),
+    lock: lock,
   );
 }
 

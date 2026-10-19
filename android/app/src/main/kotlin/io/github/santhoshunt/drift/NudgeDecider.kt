@@ -68,6 +68,9 @@ data class NudgeSnapshot(
     val guessOffCategories: Set<String>,
     val windows: List<NudgeWindow>,
     val colors: NudgeColors,
+    /** Focus lock: an app ruled off for the block locks at once. Optional
+     * in the file, false when absent, so `v` stays 1. */
+    val lock: Boolean = false,
 ) {
     companion object {
         /** The snapshot, or null when anything required is missing or of
@@ -100,6 +103,7 @@ data class NudgeSnapshot(
                 guessOffCategories = json.strings("guessOffCategories") ?: return null,
                 windows = windows,
                 colors = NudgeColors.parse(json.opt("colors") as? JSONObject),
+                lock = json.opt("lock") as? Boolean ?: false,
             )
         }
 
@@ -131,6 +135,8 @@ sealed class NudgeDecision {
         val block: String,
         val minutesOff: Long,
         val minutesLeft: Long,
+        /** Show the lock card (hold to open) instead of the nudge. */
+        val lock: Boolean = false,
     ) : NudgeDecision()
 }
 
@@ -168,17 +174,24 @@ object NudgeDecider {
         if (window.anyApp || pkg in window.on) return NudgeDecision.None
         // An explicit rule wins; otherwise only the guessed-off categories
         // count, so an untagged app is on track by default.
-        val offTrack = pkg in window.off || category in snapshot.guessOffCategories
+        val ruledOff = pkg in window.off
+        val offTrack = ruledOff || category in snapshot.guessOffCategories
         if (!offTrack) return NudgeDecision.None
-        if (continuousMs < snapshot.nudgeAfterMin * MINUTE_MS) return NudgeDecision.None
-        if (lastNudgeMs != null && nowMs - lastNudgeMs < snapshot.repeatMin * MINUTE_MS) {
-            return NudgeDecision.None
+        // Only an app the user ruled off locks; a category guess keeps the
+        // nudge and both waits, so an unasked messaging app is never locked.
+        val lock = snapshot.lock && ruledOff
+        if (!lock) {
+            if (continuousMs < snapshot.nudgeAfterMin * MINUTE_MS) return NudgeDecision.None
+            if (lastNudgeMs != null && nowMs - lastNudgeMs < snapshot.repeatMin * MINUTE_MS) {
+                return NudgeDecision.None
+            }
         }
         if (snoozedUntilMs != null && snoozedUntilMs > nowMs) return NudgeDecision.None
         return NudgeDecision.Nudge(
             block = window.block,
             minutesOff = continuousMs / MINUTE_MS,
             minutesLeft = (window.endMs - nowMs + MINUTE_MS - 1) / MINUTE_MS,
+            lock = lock,
         )
     }
 

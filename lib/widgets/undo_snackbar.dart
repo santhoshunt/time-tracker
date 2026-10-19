@@ -56,6 +56,9 @@ void showAppToastOn(
       persist:
           hasAction &&
           MediaQuery.maybeAccessibleNavigationOf(messenger.context) == true,
+      // A sideways swipe either way dismisses; Undo stays a button, so a
+      // swipe never undoes anything.
+      dismissDirection: DismissDirection.horizontal,
       // The pill's shadow spills past the bar.
       clipBehavior: Clip.none,
       // The bar itself is invisible; the pill inside is the toast, drawn

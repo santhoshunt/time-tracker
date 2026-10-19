@@ -194,6 +194,29 @@ PeriodSummary summarize(List<DayData> days) {
   );
 }
 
+/// Good days in a row up to [today], from [points] oldest first.
+///
+/// Counts back from the newest scored day on or before [today]. Days with
+/// no score are skipped, as in [PeriodSummary.bestStreak], and today only
+/// adds to the run once it scores [goodPercent] or more: a day still in
+/// progress never breaks a streak the earlier days built.
+int currentStreak(List<DayPoint> points, DateTime today) {
+  var streak = 0;
+  for (final p in points.reversed) {
+    if (p.day.isAfter(today)) continue;
+    final v = p.percent;
+    if (v == null) continue;
+    if (v >= goodPercent) {
+      streak++;
+    } else if (p.day == today) {
+      continue;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 /// [now]'s score minus [previous]'s, or null when either has no score.
 int? deltaPercent(PeriodSummary now, PeriodSummary previous) {
   final a = now.percent, b = previous.percent;

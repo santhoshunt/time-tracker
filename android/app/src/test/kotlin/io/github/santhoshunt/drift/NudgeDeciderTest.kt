@@ -62,6 +62,7 @@ class NudgeDeciderTest {
                     e.getString("block"),
                     e.getLong("minutesOff"),
                     e.getLong("minutesLeft"),
+                    e.optBoolean("lock", false),
                 )
             } else {
                 NudgeDecision.None
@@ -82,6 +83,14 @@ class NudgeDeciderTest {
         assertEquals(NudgeColors(), snapshot!!.colors)
         assertEquals(2, snapshot.windows.size)
         assertEquals(setOf("com.example.notes", "com.example.chat"), snapshot.windows[0].on)
+        assertEquals(false, snapshot.lock)
+    }
+
+    @Test
+    fun lockIsReadAndAWrongTypeMeansNoLock() {
+        val lock = fixture().getJSONObject("snapshots").getJSONObject("lock")
+        assertEquals(true, NudgeSnapshot.parse(lock)!!.lock)
+        assertEquals(false, NudgeSnapshot.parse(base().put("lock", "yes"))!!.lock)
     }
 
     @Test

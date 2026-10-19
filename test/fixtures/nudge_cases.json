@@ -53,9 +53,33 @@
       "windows": [
         {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": [], "off": ["com.example.video"]}
       ]
+    },
+    "lock": {
+      "v": 1,
+      "writtenAtMs": 1760846400000,
+      "enabled": true,
+      "nudgeAfterMin": 5,
+      "repeatMin": 15,
+      "quietStartMin": 1320,
+      "quietEndMin": 420,
+      "guessOffCategories": ["game", "video", "social", "news"],
+      "lock": true,
+      "windows": [
+        {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": ["com.example.notes", "com.example.chat"], "off": ["com.example.video"]},
+        {"startMs": 1760860800000, "endMs": 1760864400000, "block": "Lunch", "anyApp": true, "on": [], "off": []}
+      ]
     }
   },
   "cases": [
+    {"name": "lock: a ruled-off app locks after 10 seconds", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 10000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "lock": true, "block": "Deep work", "minutesOff": 0, "minutesLeft": 150}},
+    {"name": "lock: locks again a minute after the last one", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": 1760851740000, "snoozedUntilMs": null, "expect": {"nudge": true, "lock": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "lock: a guessed-off app under the threshold is left alone", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.newgame", "category": "game", "continuousMs": 10000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "lock: a guessed-off app past the threshold gets a plain nudge", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.newgame", "category": "game", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "lock": false, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "lock: a guessed-off nudge keeps the repeat limit", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.newgame", "category": "game", "continuousMs": 360000, "lastNudgeMs": 1760851200000, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "lock: an app opened with the hold stays open for its 5 minutes", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": 1760852100000, "expect": {"nudge": false}},
+    {"name": "lock: an on-track rule is never locked", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.chat", "category": "social", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "lock: any app is fine at lunch", "snapshot": "lock", "nowMs": 1760863200000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "lock: nothing locks in quiet hours", "snapshot": "lock", "nowMs": 1760851800000, "nowLocalMin": 1380, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
     {"name": "off-track app past the threshold", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
     {"name": "under the threshold", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 240000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
     {"name": "exactly at the threshold, minutes left rounded up", "snapshot": "base", "nowMs": 1760860710000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 300000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 5, "minutesLeft": 2}},

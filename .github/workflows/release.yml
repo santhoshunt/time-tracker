@@ -77,8 +77,10 @@ jobs:
           keyAlias=drift
           EOF
 
-      # One universal APK: the in-app updater downloads this single asset.
-      - run: flutter build apk --release
+      # One APK, the single asset the in-app updater downloads, built for
+      # 64-bit ARM only: about half the size of a fat APK, and every phone
+      # Drift runs on is arm64.
+      - run: flutter build apk --release --target-platform android-arm64
 
       - name: Remove the release key
         if: always()
@@ -100,6 +102,17 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           code=$(sed -n 's/^version: [0-9.]*+\([0-9]*\).*/\1/p' pubspec.yaml)
           "$BT/aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | head -1 | grep -q "package: name='io.github.santhoshunt.drift' versionCode='$code' "
+
+      # Native code for one ABI only, and Drift's own Dart code in it: a
+      # plugin shipping other ABIs, or a build that lost libapp.so, fails
+      # here instead of on the phone.
+      - name: Verify the APK is arm64 only
+        run: |
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | awk '{print $4}' | grep '^lib/' > abis.txt
+          cat abis.txt
+          test -z "$(grep -v '^lib/arm64-v8a/' abis.txt)"
+          grep -q '^lib/arm64-v8a/libapp.so$' abis.txt
+          grep -q '^lib/arm64-v8a/libflutter.so$' abis.txt
 
       # Plugins that call Kotlin by name through JNI break when R8 renames
       # or removes the target (shared_preferences_android 2.5 did, and the

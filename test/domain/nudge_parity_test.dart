@@ -16,7 +16,17 @@ void main() {
   };
 
   test('the fixture has cases for every rule', () {
-    expect((fixture['cases'] as List).length, greaterThanOrEqualTo(19));
+    expect((fixture['cases'] as List).length, greaterThanOrEqualTo(28));
+  });
+
+  test('a snapshot without lock reads as no lock, and lock round-trips', () {
+    expect(snapshots['base']!.lock, isFalse);
+    expect(snapshots['lock']!.lock, isTrue);
+    final again = NudgeSnapshot.fromJson(
+      jsonDecode(jsonEncode(snapshots['lock']!.toJson()))
+          as Map<String, dynamic>,
+    );
+    expect(again.lock, isTrue);
   });
 
   for (final c in (fixture['cases'] as List).cast<Map<String, dynamic>>()) {
@@ -38,6 +48,7 @@ void main() {
         expect(n.block, expected['block']);
         expect(n.minutesOff, expected['minutesOff']);
         expect(n.minutesLeft, expected['minutesLeft']);
+        expect(n.lock, expected['lock'] ?? false);
       } else {
         expect(decision, isA<NoNudge>());
       }

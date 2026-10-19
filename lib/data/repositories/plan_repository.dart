@@ -78,6 +78,18 @@ class PlanRepository {
     return rows.isEmpty ? null : rows.first['blocks_json'] as String;
   }
 
+  /// Frozen plan JSON by yyyy-MM-dd for every frozen day in [from, to).
+  /// `day_plans.date` sorts as text in date order, so one query does.
+  Future<Map<String, String>> frozenPlansBetween(DateTime from, DateTime to) async {
+    final rows = await db.query(
+      'day_plans',
+      columns: ['date', 'blocks_json'],
+      where: 'date >= ? AND date < ?',
+      whereArgs: [dateKey(from), dateKey(to)],
+    );
+    return {for (final r in rows) r['date'] as String: r['blocks_json'] as String};
+  }
+
   /// Stores [json] as [date]'s frozen plan unless one is already stored,
   /// and returns whether it wrote. A frozen plan is never overwritten:
   /// it is the record of what the plan was on that day.

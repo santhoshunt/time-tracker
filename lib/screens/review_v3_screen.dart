@@ -9,6 +9,7 @@ import '../painters/day_strip_painter.dart';
 import '../painters/month_heatmap_painter.dart';
 import '../painters/trend_painter.dart';
 import '../painters/week_bars_painter.dart';
+import '../providers/settings_provider.dart';
 import '../services/day_loader.dart';
 import '../services/period_loader.dart';
 import '../services/review_summary.dart';
@@ -1177,11 +1178,25 @@ class _WeekView extends StatelessWidget {
             'Drift total',
             s.offMin == 0 ? 'No drift' : formatMinutes(s.offMin),
           ),
+          _InfoRow(
+            'Weekly target',
+            weeklyTargetLabel(
+              s.percent,
+              context.watch<SettingsProvider>().weeklyTarget,
+            ),
+          ),
         ]),
         ..._topDrift(context, s.topDrift, s.labelOf),
       ],
     );
   }
+}
+
+/// "81% of 80%, met", "72% of 80%, not met", "No score yet" or "Off".
+String weeklyTargetLabel(int? percent, int target) {
+  if (target <= 0) return 'Off';
+  if (percent == null) return 'No score yet';
+  return '$percent% of $target%, ${percent >= target ? 'met' : 'not met'}';
 }
 
 // Month: option A.

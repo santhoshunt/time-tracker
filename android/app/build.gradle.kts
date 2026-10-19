@@ -43,6 +43,16 @@ android {
         versionName = flutter.versionName
     }
 
+    // 64-bit ARM only. --target-platform android-arm64 limits Flutter's own
+    // libraries, but the jni and DataStore plugins still pack theirs for
+    // every ABI (an ndk abiFilters line did not reach them), so their other
+    // copies are dropped when the APK is packaged.
+    packaging {
+        jniLibs {
+            excludes += setOf("lib/armeabi-v7a/**", "lib/x86_64/**", "lib/x86/**")
+        }
+    }
+
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
