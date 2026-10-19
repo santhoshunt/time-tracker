@@ -6,7 +6,6 @@ import 'package:drift_time/providers/settings_provider.dart';
 import 'package:drift_time/screens/diagnostics_screen.dart';
 import 'package:drift_time/screens/icon_picker_screen.dart';
 import 'package:drift_time/screens/onboarding_screen.dart';
-import 'package:drift_time/screens/review_screen.dart';
 import 'package:drift_time/screens/settings_screen.dart';
 import 'package:drift_time/screens/theme_picker_screen.dart';
 import 'package:drift_time/screens/today_screen.dart';
@@ -58,13 +57,6 @@ void main() {
       await settings.setTodayView(TodayView.ring);
       await pumpGolden(tester, withProviders(s, settings, tabs(const TodayScreen())), theme: theme);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/today_ring_${theme.key}.png'));
-      await s.db.close();
-    });
-
-    testWidgets('review, ${theme.key}', (tester) async {
-      final (s, settings) = await setup(theme);
-      await pumpGolden(tester, withProviders(s, settings, tabs(const ReviewScreen())), theme: theme);
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/review_day_${theme.key}.png'));
       await s.db.close();
     });
 

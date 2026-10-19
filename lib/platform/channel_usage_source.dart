@@ -74,6 +74,17 @@ class ChannelUsageSource implements UsageSource {
     };
   }
 
+  /// Unlike the queries, a failed save must reach the user, so errors
+  /// propagate instead of turning into a default.
+  @override
+  Future<String> saveCsv(String name, String text) async {
+    final where = await channel.invokeMethod<String>('saveCsv', {
+      'name': name,
+      'text': text,
+    });
+    return where ?? name;
+  }
+
   /// The channel result, or null when the native side failed or is absent
   /// (tests, a platform without the bridge).
   Future<T?> _call<T>(String method, [Map<String, Object?>? args]) async {

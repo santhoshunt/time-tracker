@@ -21,6 +21,7 @@ class SettingsProvider extends ChangeNotifier {
   static const _kQuietStart = 'quiet_start_min_v1';
   static const _kQuietEnd = 'quiet_end_min_v1';
   static const _kSkippedSetup = 'setup_skipped_v1';
+  static const _kWeekStart = 'week_start_v1';
   static const _kLastUpdateVersion = 'update_last_success_version_v1';
   static const _kLastUpdateMs = 'update_last_success_ms_v1';
 
@@ -38,8 +39,12 @@ class SettingsProvider extends ChangeNotifier {
   int _quietStartMin = 22 * 60;
   int _quietEndMin = 7 * 60;
   Set<String> _skippedSetup = const {};
+  int _firstWeekday = DateTime.monday;
 
   ThemeId get theme => _theme;
+
+  /// DateTime.monday or DateTime.sunday: where week reviews start.
+  int get firstWeekday => _firstWeekday;
 
   /// Live nudges on or off. On by default, as Sandy asked for both live
   /// nudges and the end-of-day review.
@@ -109,7 +114,27 @@ class SettingsProvider extends ChangeNotifier {
       () => (prefs.getStringList(_kSkippedSetup) ?? const []).toSet(),
       const <String>{},
     );
+    _firstWeekday = _read(
+      () => prefs.getString(_kWeekStart) == 'sunday'
+          ? DateTime.sunday
+          : DateTime.monday,
+      DateTime.monday,
+    );
     notifyListeners();
+  }
+
+  Future<void> setFirstWeekday(int day) async {
+    final value = day == DateTime.sunday ? DateTime.sunday : DateTime.monday;
+    if (value == _firstWeekday) return;
+    _firstWeekday = value;
+    notifyListeners();
+    await _persist(
+      _kWeekStart,
+      (p) => p.setString(
+        _kWeekStart,
+        value == DateTime.sunday ? 'sunday' : 'monday',
+      ),
+    );
   }
 
   Future<void> setNudgesEnabled(bool value) async {

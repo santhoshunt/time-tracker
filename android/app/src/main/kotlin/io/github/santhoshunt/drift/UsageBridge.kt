@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,10 +12,12 @@ import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.Process
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.graphics.drawable.toBitmap
 import io.flutter.plugin.common.MethodCall
@@ -39,6 +42,9 @@ class UsageBridge(private val activity: Activity) {
 
         /** `<fromMs>-<toMs>.jsonl`, as UsageBufferWorker names them. */
         val BUFFER_FILE = Regex("^[0-9]+-[0-9]+\\.jsonl$")
+
+        /** Export file names Dart may ask for: no folders, no tricks. */
+        private val SAFE_NAME = Regex("^[A-Za-z0-9_-]+\\.csv$")
 
         private const val ICON_PX = 96
         private const val TEN_DAYS_MS = 10L * 24 * 60 * 60 * 1000
@@ -162,6 +168,15 @@ class UsageBridge(private val activity: Activity) {
                 }
             }
             "diagnostics" -> background(result) { diagnostics() }
+            "saveCsv" -> {
+                val name = call.argument<String>("name")
+                val text = call.argument<String>("text")
+                if (name == null || text == null || !SAFE_NAME.matches(name)) {
+                    result.error("BAD_ARGS", "A plain .csv file name and text are required.", null)
+                } else {
+                    background(result) { saveCsv(name, text) }
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -185,6 +200,40 @@ class UsageBridge(private val activity: Activity) {
                 )
             }
         }
+    }
+
+    /** Writes an export where the user can find it and returns where that
+     * is, in words. Android 10 and later: Downloads/Drift through
+     * MediaStore, which needs no storage permission. Android 9: Drift's own
+     * documents folder, which needs none either. */
+    private fun saveCsv(name: String, text: String): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+                put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Drift")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = activity.contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("Android did not create the file")
+            try {
+                resolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+                    ?: error("Android did not open the file")
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                resolver.delete(uri, null, null)
+                throw e
+            }
+            return "Downloads/Drift/$name"
+        }
+        val dir = activity.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: activity.filesDir
+        val file = File(dir, name)
+        file.writeText(text)
+        return file.path
     }
 
     /** Some ROMs lack these settings screens; a bare startActivity would

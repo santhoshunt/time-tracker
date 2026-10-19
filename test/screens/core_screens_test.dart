@@ -3,7 +3,6 @@ import 'package:drift_time/domain/models.dart';
 import 'package:drift_time/providers/settings_provider.dart';
 import 'package:drift_time/screens/diagnostics_screen.dart';
 import 'package:drift_time/screens/icon_picker_screen.dart';
-import 'package:drift_time/screens/review_screen.dart';
 import 'package:drift_time/screens/settings_screen.dart';
 import 'package:drift_time/screens/theme_picker_screen.dart';
 import 'package:drift_time/screens/today_screen.dart';
@@ -154,8 +153,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('v0.1.0'), findsOneWidget);
       expect(find.text('Mono'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('v0.1.0'), 200);
+      expect(find.text('v0.1.0'), findsOneWidget);
       expect(find.text('Melting clock'), findsOneWidget);
     });
 
@@ -188,12 +188,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(settings.updateOnLaunch, isTrue);
+      await tester.scrollUntilVisible(find.text('Check on launch'), 200);
+      await tester.pumpAndSettle();
       final row = find.ancestor(
         of: find.text('Check on launch'),
         matching: find.byType(InkWell),
       );
-      await tester.ensureVisible(row);
-      await tester.pumpAndSettle();
       await tester.tap(find.descendant(of: row, matching: find.byType(Switch)));
       await tester.pumpAndSettle();
       expect(settings.updateOnLaunch, isFalse);
@@ -242,23 +242,6 @@ void main() {
 
       final lines = await collectDiagnostics(services, reloaded, packageInfo: _info);
       expect(diagnosticsReport(lines), contains('last_in_app_update: v0.1.1, 5 min ago'));
-    });
-  });
-
-  group('Review', () {
-    testWidgets('shows drift by block and steps back a day', (tester) async {
-      await seedSampleDay(services, testNow);
-      await tester.pumpWidget(withApp(services, settings, const Scaffold(body: ReviewScreen())));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Drift by block'), findsOneWidget);
-      expect(find.text('YouTube'), findsOneWidget);
-
-      await tester.tap(find.byTooltip('Previous day'));
-      await tester.pumpAndSettle();
-      expect(find.text('Sun 18 Oct'), findsOneWidget);
-      expect(find.text('Nothing planned yet'), findsOneWidget);
     });
   });
 }

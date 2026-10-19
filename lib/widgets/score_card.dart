@@ -29,29 +29,30 @@ class ScoreCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        // Option A: the button sits under the text, so long text never runs
+        // into it on a narrow phone.
         child: s == null
-            ? Row(
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Nothing planned yet', style: text.titleMedium),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Lay out your day to see where it drifts.',
-                          style: text.bodySmall?.copyWith(
-                            color: c.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  Text('Nothing planned yet', style: text.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Lay out your day to see where it drifts.',
+                    style: text.bodySmall?.copyWith(color: c.textSecondary),
                   ),
-                  if (onPlan != null)
+                  if (onPlan != null) ...[
+                    const SizedBox(height: 12),
                     FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        visualDensity: VisualDensity.compact,
+                      ),
                       onPressed: onPlan,
                       child: const Text('Plan today'),
                     ),
+                  ],
                 ],
               )
             : Row(

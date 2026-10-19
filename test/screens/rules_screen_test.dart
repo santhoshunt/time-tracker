@@ -114,4 +114,122 @@ void main() {
     );
     expect(find.byType(Dismissible), findsNothing);
   });
+
+  group('Not sorted', () {
+    /// The row of the guessed pair ([block], [p]) on the Not sorted tab.
+    Finder unsortedRow(String block, String p) => find.byKey(ValueKey('unsorted|$block|$p'));
+
+    Future<void> openNotSorted(WidgetTester tester) async {
+      await tester.tap(find.textContaining('Not sorted'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Friday 16 October, a weekday with the same blocks: WhatsApp again in
+    /// Deep work (a pair today also has) and Spotify in Deep work (a pair
+    /// only this day has).
+    Future<void> seedFriday() async {
+      final d = DateTime(2026, 10, 16);
+      DateTime at(int h, int m) => DateTime(d.year, d.month, d.day, h, m);
+      await s.sessions.replaceDay(
+        d,
+        DateTime(d.year, d.month, d.day + 1),
+        [
+          Session(p: 'com.example.music', start: at(9, 30), end: at(9, 45)),
+          Session(p: 'com.example.chat', start: at(10, 0), end: at(10, 15)),
+        ],
+        const [],
+      );
+    }
+
+    testWidgets('the tabs show with the count of guessed pairs', (tester) async {
+      await seedSampleDay(s, testNow);
+      await pumpRules(tester);
+
+      expect(find.text('Sorted'), findsOneWidget);
+      // WhatsApp in Deep work and Spotify in Gym have only a guess.
+      expect(find.text('Not sorted (2)'), findsOneWidget);
+    });
+
+    testWidgets('a tick writes an on rule, removes the row and lists it under Sorted', (tester) async {
+      await seedSampleDay(s, testNow);
+      var bumps = 0;
+      s.revision.addListener(() => bumps++);
+      await pumpRules(tester);
+      await openNotSorted(tester);
+
+      final row = unsortedRow('deep work', 'com.example.chat');
+      expect(find.descendant(of: row, matching: find.text('Deep work · guess off')), findsOneWidget);
+      await tester.tap(find.descendant(of: row, matching: find.byTooltip('On track')));
+      await tester.pumpAndSettle();
+
+      expect((await s.rules.allRules())[('deep work', 'com.example.chat')], Verdict.onTrack);
+      expect(bumps, 1);
+      expect(row, findsNothing);
+      expect(find.text('Not sorted (1)'), findsOneWidget);
+      expect(find.text('WhatsApp counts as on track in Deep work'), findsOneWidget);
+
+      await tester.tap(find.text('Sorted'));
+      await tester.pumpAndSettle();
+      expect(tagOf(tester, 'WhatsApp'), 'On track');
+    });
+
+    testWidgets('a cross writes an off rule', (tester) async {
+      await seedSampleDay(s, testNow);
+      await pumpRules(tester);
+      await openNotSorted(tester);
+
+      final row = unsortedRow('gym', 'com.example.music');
+      await tester.tap(find.descendant(of: row, matching: find.byTooltip('Off track')));
+      await tester.pumpAndSettle();
+
+      expect((await s.rules.allRules())[('gym', 'com.example.music')], Verdict.offTrack);
+      expect(row, findsNothing);
+      expect(find.text('Spotify counts as off track in Gym'), findsOneWidget);
+      expect(find.text('Not sorted (1)'), findsOneWidget);
+    });
+
+    testWidgets('a pair used on several days shows once, newest first', (tester) async {
+      await seedSampleDay(s, testNow);
+      await seedFriday();
+      await pumpRules(tester);
+
+      expect(find.text('Not sorted (3)'), findsOneWidget);
+      await openNotSorted(tester);
+
+      expect(find.text('WhatsApp'), findsOneWidget);
+      final ys = [
+        for (final r in [
+          unsortedRow('deep work', 'com.example.chat'),
+          unsortedRow('gym', 'com.example.music'),
+          unsortedRow('deep work', 'com.example.music'),
+        ])
+          tester.getTopLeft(r).dy,
+      ];
+      expect(ys, orderedEquals([...ys]..sort()));
+    });
+
+    testWidgets('a rule stored elsewhere drops the row on the next revision', (tester) async {
+      await seedSampleDay(s, testNow);
+      await pumpRules(tester);
+      await openNotSorted(tester);
+
+      await s.rules.upsertRule('Gym', 'com.example.music', Verdict.onTrack, testNow);
+      s.bump();
+      await tester.pumpAndSettle();
+
+      expect(unsortedRow('gym', 'com.example.music'), findsNothing);
+      expect(find.text('Not sorted (1)'), findsOneWidget);
+    });
+
+    testWidgets('shows an empty state when nothing waits', (tester) async {
+      await pumpRules(tester);
+
+      expect(find.text('Not sorted'), findsOneWidget);
+      await openNotSorted(tester);
+      expect(
+        find.text('Nothing waiting. Drift asks about new apps as you use them.'),
+        findsOneWidget,
+      );
+    });
+  });
 }

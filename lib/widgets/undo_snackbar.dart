@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/drift_theme.dart';
+
 /// Tones for [showAppToast]: each picks the icon's tint and a fallback icon.
 /// Call sites pass the operation's own icon; the tone says what kind of
 /// outcome it was: [change] edits (accent), [removal] deletes and discards
@@ -68,8 +70,12 @@ void showAppToastOn(
           final theme = Theme.of(context);
           final scheme = theme.colorScheme;
           final bar = theme.snackBarTheme;
+          final drift = theme.extension<DriftColors>();
           final (fallback, color) = switch (tone) {
-            AppToastTone.success => (Icons.check, Colors.green.shade600),
+            AppToastTone.success => (
+              Icons.check,
+              drift?.onTrack ?? Colors.green.shade600,
+            ),
             AppToastTone.change => (Icons.edit_outlined, scheme.primary),
             AppToastTone.removal => (Icons.delete_outline, scheme.error),
             AppToastTone.error => (Icons.error_outline, scheme.error),
@@ -77,12 +83,22 @@ void showAppToastOn(
           };
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            // Toast option B: an accent-tinted pill with an accent edge, so it
+            // belongs to the theme instead of a white bar on a dark page.
             child: Material(
-              color: bar.backgroundColor ?? scheme.surfaceContainerHigh,
-              shape:
-                  bar.shape ??
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: bar.elevation ?? 6,
+              color: drift == null
+                  ? (bar.backgroundColor ?? scheme.surfaceContainerHigh)
+                  : Color.alphaBlend(
+                      drift.accent.withValues(alpha: 0.12),
+                      drift.card,
+                    ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: drift == null
+                    ? BorderSide.none
+                    : BorderSide(color: drift.accent.withValues(alpha: 0.45)),
+              ),
+              elevation: 0,
               clipBehavior: Clip.antiAlias,
               child: Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(
@@ -109,16 +125,21 @@ void showAppToastOn(
                         // The SnackBar default is light text for a dark
                         // bar; the pill is light unless the theme says
                         // otherwise.
-                        style:
-                            bar.contentTextStyle ??
-                            TextStyle(color: scheme.onSurface),
+                        style: drift == null
+                            ? (bar.contentTextStyle ??
+                                  TextStyle(color: scheme.onSurface))
+                            : theme.textTheme.bodyMedium?.copyWith(
+                                color: drift.text,
+                              ),
                       ),
                     ),
                     if (actionLabel != null && onAction != null)
                       TextButton(
                         style: TextButton.styleFrom(
                           foregroundColor:
-                              bar.actionTextColor ?? scheme.primary,
+                              drift?.accent ??
+                              bar.actionTextColor ??
+                              scheme.primary,
                         ),
                         onPressed: () {
                           if (fired) return;

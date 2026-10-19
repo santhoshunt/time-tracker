@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 import '../app_services.dart';
 import '../icons/drift_icons.dart';
 import '../providers/settings_provider.dart';
+import '../services/csv_export.dart';
 import '../services/update_service.dart';
 import '../theme/drift_theme.dart';
 import '../widgets/settings_group.dart';
+import '../widgets/time_wheel.dart';
 import '../widgets/undo_snackbar.dart';
 import '../widgets/update_sheet.dart';
 import 'diagnostics_screen.dart';
@@ -28,11 +30,20 @@ String quietHoursLabel(int start, int end) {
 /// (Check for updates, Check on launch) and Help (Diagnostics). Each
 /// picker opens its own page.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.updateService, this.packageInfo});
+  const SettingsScreen({
+    super.key,
+    this.updateService,
+    this.packageInfo,
+    this.daysLoader,
+  });
 
   /// Tests inject a service with a fake HTTP client.
   final UpdateService? updateService;
   final Future<PackageInfo> Function()? packageInfo;
+
+  /// How the export loads history; the home shell passes the Review tab's
+  /// fast range loader.
+  final DaysLoader? daysLoader;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -40,6 +51,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _checking = false;
+  bool _exporting = false;
   String? _version;
   DriftIcon? _icon;
 
@@ -71,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required int current,
     required String Function(int) label,
     required Future<void> Function(int) onPicked,
+    String? help,
   }) async {
     final picked = await showModalBottomSheet<int>(
       context: context,
@@ -91,6 +104,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
                 child: Text(title, style: Theme.of(context).textTheme.titleMedium),
               ),
+              if (help != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text(
+                    help,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.drift.textSecondary,
+                    ),
+                  ),
+                ),
               for (final o in options)
                 RadioListTile<int>(value: o, title: Text(label(o))),
               const SizedBox(height: 8),
@@ -103,26 +126,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (picked != null) await onPicked(picked);
   }
 
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final services = context.read<AppServices>();
+    try {
+      final where = await exportAllCsv(
+        services,
+        widget.daysLoader ?? dayByDay(services),
+      );
+      showAppToastOn(
+        messenger,
+        'Saved to $where',
+        tone: AppToastTone.success,
+        icon: Icons.download_done,
+      );
+    } catch (e) {
+      showAppToastOn(
+        messenger,
+        "Couldn't save the export. Try again.",
+        tone: AppToastTone.error,
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  /// Quiet hours option A: From and Until wheels in one sheet, the same
+  /// wheels as the block editor (the Material clock dial was hard to read).
   Future<void> _pickQuietHours() async {
     final settings = context.read<SettingsProvider>();
-    TimeOfDay at(int m) => TimeOfDay(hour: m ~/ 60, minute: m % 60);
-    Future<TimeOfDay?> pick(String help, int m) => showTimePicker(
-      context: context,
-      helpText: help,
-      initialTime: at(m),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
+    final picked = await showQuietHoursSheet(
+      context,
+      start: settings.quietStartMin,
+      end: settings.quietEndMin,
     );
-    final start = await pick('Quiet from', settings.quietStartMin);
-    if (start == null || !mounted) return;
-    final end = await pick('Quiet until', settings.quietEndMin);
-    if (end == null) return;
-    await settings.setQuietHours(
-      start.hour * 60 + start.minute,
-      end.hour * 60 + end.minute,
-    );
+    if (picked == null) return;
+    await settings.setQuietHours(picked.$1, picked.$2);
   }
 
   Future<void> _checkForUpdates() async {
@@ -184,10 +225,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 if (settings.nudgesEnabled) ...[
                   SettingsRow(
-                    title: 'Nudge after',
+                    title: 'First nudge after',
                     value: '${settings.nudgeAfterMin} min',
                     onTap: () => _pickMinutes(
-                      title: 'Nudge after this much drift',
+                      title: 'First nudge after this much drift',
+                      help:
+                          'How long you can stay on an off-track app before '
+                          'Drift nudges you.',
                       options: const [2, 5, 10, 15, 30],
                       current: settings.nudgeAfterMin,
                       label: (m) => '$m min',
@@ -195,10 +239,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   SettingsRow(
-                    title: 'Repeat at most',
-                    value: 'every ${settings.nudgeRepeatMin} min',
+                    title: 'Nudge again after',
+                    value: '${settings.nudgeRepeatMin} min',
                     onTap: () => _pickMinutes(
-                      title: 'Nudge again at most every',
+                      title: 'Wait this long before nudging again',
+                      help:
+                          'After a nudge, Drift stays quiet this long even if '
+                          'you stay off track. "5 more minutes" overrides it '
+                          'for that app.',
                       options: const [5, 10, 15, 30, 60],
                       current: settings.nudgeRepeatMin,
                       label: (m) => '$m min',
@@ -234,6 +282,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: icon?.label,
                   leading: icon == null ? null : DriftIconTile(icon, 28),
                   onTap: () => _open(const IconPickerScreen()),
+                ),
+              ],
+            ),
+            SettingsGroup(
+              title: 'Data',
+              children: [
+                SettingsRow(
+                  title: 'Week starts on',
+                  value: settings.firstWeekday == DateTime.sunday
+                      ? 'Sunday'
+                      : 'Monday',
+                  onTap: () => _pickMinutes(
+                    title: 'Week starts on',
+                    options: const [DateTime.monday, DateTime.sunday],
+                    current: settings.firstWeekday,
+                    label: (d) => d == DateTime.sunday ? 'Sunday' : 'Monday',
+                    onPicked: settings.setFirstWeekday,
+                  ),
+                ),
+                SettingsRow(
+                  title: 'Export to CSV',
+                  value: 'to Downloads',
+                  onTap: _export,
+                  trailing: _exporting
+                      ? SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: c.accent,
+                          ),
+                        )
+                      : null,
                 ),
               ],
             ),

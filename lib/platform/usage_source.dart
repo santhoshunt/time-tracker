@@ -40,6 +40,11 @@ abstract class UsageSource {
 
   /// {"workerLastRunMs": int?, "bufferFiles": int, "bufferCursorMs": int?}
   Future<Map<String, Object?>> diagnostics();
+
+  /// Saves an export where the user can find it (Downloads/Drift on
+  /// Android 10 and later) and returns where, in words. [name] must be a
+  /// plain `name.csv`. Throws when Android cannot write it.
+  Future<String> saveCsv(String name, String text);
 }
 
 /// The `k` values Kotlin sends, one per UsageEvents.Event type it keeps.

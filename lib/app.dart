@@ -7,10 +7,11 @@ import 'app_services.dart';
 import 'providers/settings_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/plan_screen.dart';
-import 'screens/review_screen.dart';
+import 'screens/review_v3_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/today_screen.dart';
 import 'services/day_loader.dart';
+import 'services/period_loader.dart';
 import 'services/nudge_sync.dart';
 import 'services/update_installer.dart';
 import 'services/update_launch_check.dart';
@@ -194,8 +195,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         children: [
           TodayScreen(onPlan: () => setState(() => _tab = 1)),
           const PlanScreen(),
-          const ReviewScreen(),
-          const SettingsScreen(),
+          ReviewV3Screen(firstWeekday: context.watch<SettingsProvider>().firstWeekday),
+          SettingsScreen(daysLoader: (first, last) => loadDays(_services, first, last)),
         ],
       ),
       bottomNavigationBar: NavigationBar(

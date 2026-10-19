@@ -1,8 +1,6 @@
 import '../app_services.dart';
-import '../domain/classifier.dart';
 import '../domain/models.dart';
-import '../domain/plan_resolver.dart';
-import '../domain/scorer.dart';
+import 'period_loader.dart';
 
 /// Everything one screen needs to draw a day: the plan placed on that day,
 /// the classified time and the score.
@@ -32,18 +30,27 @@ class DayData {
 
   String labelOf(String? p) => p == null ? '' : (labels[p] ?? p);
 
+  /// Least guessed use of an app in a block, across the day, before Drift
+  /// asks about it. A second's glimpse is not worth a question.
+  static const askAfter = Duration(minutes: 1);
+
   /// Segments that still wait for the user's answer, oldest first, one
-  /// per (block, app) pair.
+  /// per (block, app) pair used for at least [askAfter] that day.
   List<Segment> get unanswered {
-    final seen = <(String, String)>{};
-    final out = <Segment>[];
+    final first = <(String, String), Segment>{};
+    final used = <(String, String), Duration>{};
     for (final s in segments) {
       final guessed =
           s.verdict == Verdict.guessedOn || s.verdict == Verdict.guessedOff;
       if (!guessed || s.p == null || s.blockName == null) continue;
-      if (seen.add((blockKey(s.blockName!), s.p!))) out.add(s);
+      final key = (blockKey(s.blockName!), s.p!);
+      first.putIfAbsent(key, () => s);
+      used[key] = (used[key] ?? Duration.zero) + s.duration;
     }
-    return out;
+    return [
+      for (final MapEntry(:key, :value) in first.entries)
+        if (used[key]! >= askAfter) value,
+    ];
   }
 
   /// Off-track minutes per app (guessed off included), largest first.
@@ -64,44 +71,9 @@ class DayData {
   }
 }
 
-/// Loads and classifies [day] (any time on it) from the database. Past
-/// days use their frozen plan when one exists, so later edits to a
+/// Loads and classifies [day] (any time on it) from the database. It is
+/// [loadDays] for a single day, so Today and Review can never disagree.
+/// Past days use their frozen plan when one exists, so later edits to a
 /// repeating block do not rewrite history.
-Future<DayData> loadDay(AppServices s, DateTime day) async {
-  final now = s.clock.now();
-  final frame = DayFrame.local(day);
-  final frozen = await s.plans.frozenPlan(frame.start);
-  final blocks = resolvePlan(
-    frame.start,
-    await s.plans.allBlocks(),
-    frozenJson: frozen,
-  );
-  final sessions = await s.sessions.sessionsBetween(frame.start, frame.end);
-  final idle = await s.sessions.idleBetween(frame.start, frame.end);
-  final gaps = await s.sessions.gapsBetween(frame.start, frame.end);
-  final rules = await s.rules.allRules();
-  final overrides = await s.rules.overridesBetween(frame.start, frame.end);
-  final apps = await s.apps.all();
-  final categories = {for (final a in apps) a.p: a.category};
-  final labels = {for (final a in apps) a.p: a.label};
-
-  final segments = splitAndClassify(
-    day: frame.start,
-    blocks: blocks,
-    sessions: sessions,
-    idle: idle,
-    gaps: gaps,
-    rules: rules,
-    overrides: overrides,
-    categories: categories,
-    now: now,
-  );
-  return DayData(
-    day: frame.start,
-    blocks: blocks,
-    segments: segments,
-    score: scoreDay(segments, blocks, now),
-    labels: labels,
-    now: now,
-  );
-}
+Future<DayData> loadDay(AppServices s, DateTime day) async =>
+    (await loadDays(s, day, day)).single;

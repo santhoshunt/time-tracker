@@ -129,20 +129,20 @@ void main() {
     testWidgets('the Nudges group hides its details when switched off', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();
-      expect(find.text('Nudge after'), findsOneWidget);
+      expect(find.text('First nudge after'), findsOneWidget);
       expect(find.text('22:00 to 07:00'), findsOneWidget);
 
       await tester.tap(find.text('Live nudges'));
       await tester.pumpAndSettle();
       expect(settings.nudgesEnabled, isFalse);
-      expect(find.text('Nudge after'), findsNothing);
+      expect(find.text('First nudge after'), findsNothing);
       expect(find.text('Learned rules'), findsOneWidget);
     });
 
     testWidgets('picking a new threshold saves it', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Nudge after'));
+      await tester.tap(find.text('First nudge after'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('10 min'));
       await tester.pumpAndSettle();

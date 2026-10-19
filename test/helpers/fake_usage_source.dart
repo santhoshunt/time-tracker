@@ -147,4 +147,15 @@ class FakeUsageSource implements UsageSource {
         'bufferFiles': bufferFiles.length,
         'bufferCursorMs': null,
       };
+
+  /// Saved exports by file name; set [saveFails] to make the next save throw.
+  final savedCsv = <String, String>{};
+  bool saveFails = false;
+
+  @override
+  Future<String> saveCsv(String name, String text) async {
+    if (saveFails) throw Exception('Disk full');
+    savedCsv[name] = text;
+    return 'Downloads/Drift/$name';
+  }
 }

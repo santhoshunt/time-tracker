@@ -9,6 +9,7 @@ import '../domain/models.dart';
 import '../domain/plan_resolver.dart';
 import '../theme/drift_theme.dart';
 import '../widgets/plan_timeline.dart';
+import '../widgets/time_wheel.dart';
 
 /// Opens the block editor (option A, a form) as a full-screen page.
 ///
@@ -421,7 +422,7 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
-      builder: (_) => _TimeWheelSheet(
+      builder: (_) => TimeWheelSheet(
         title: isStart ? 'Start' : 'End',
         initial: isStart ? _start : _end,
         allowMidnightEnd: !isStart,
@@ -1139,138 +1140,6 @@ class _EmptyMessage extends StatelessWidget {
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: c.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Hour and minute wheels in 5-minute steps. The end picker also offers
-/// 24:00, so a block can run to midnight.
-class _TimeWheelSheet extends StatefulWidget {
-  const _TimeWheelSheet({
-    required this.title,
-    required this.initial,
-    required this.allowMidnightEnd,
-  });
-
-  final String title;
-  final int initial;
-  final bool allowMidnightEnd;
-
-  @override
-  State<_TimeWheelSheet> createState() => _TimeWheelSheetState();
-}
-
-class _TimeWheelSheetState extends State<_TimeWheelSheet> {
-  late int _hour = (widget.initial ~/ 60).clamp(0, _maxHour);
-  late int _minute = _hour == 24 ? 0 : (widget.initial % 60) ~/ 5 * 5;
-  late final _hours = FixedExtentScrollController(initialItem: _hour);
-  late final _minutes = FixedExtentScrollController(initialItem: _minute ~/ 5);
-
-  int get _maxHour => widget.allowMidnightEnd ? 24 : 23;
-
-  @override
-  void dispose() {
-    _hours.dispose();
-    _minutes.dispose();
-    super.dispose();
-  }
-
-  Widget _wheel({
-    required FixedExtentScrollController controller,
-    required int count,
-    required String Function(int i) label,
-    required ValueChanged<int> onSelected,
-  }) {
-    final c = context.drift;
-    final style = Theme.of(context).textTheme.headlineSmall;
-    return SizedBox(
-      width: 88,
-      child: ListWheelScrollView.useDelegate(
-        controller: controller,
-        itemExtent: 44,
-        physics: const FixedExtentScrollPhysics(),
-        perspective: 0.004,
-        diameterRatio: 1.6,
-        onSelectedItemChanged: onSelected,
-        childDelegate: ListWheelChildBuilderDelegate(
-          childCount: count,
-          builder: (context, i) => Center(
-            child: Text(
-              label(i),
-              textScaler: TextScaler.noScaling,
-              style: style?.copyWith(color: c.text),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.drift;
-    final text = Theme.of(context).textTheme;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.title, style: text.titleMedium),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 200,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: c.bg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: c.line),
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _wheel(
-                        controller: _hours,
-                        count: _maxHour + 1,
-                        label: (i) => i.toString().padLeft(2, '0'),
-                        onSelected: (i) {
-                          setState(() => _hour = i);
-                          if (i == 24 && _minute != 0) _minutes.jumpToItem(0);
-                        },
-                      ),
-                      Text(
-                        ':',
-                        textScaler: TextScaler.noScaling,
-                        style: text.headlineSmall,
-                      ),
-                      _wheel(
-                        controller: _minutes,
-                        count: 12,
-                        label: (i) => (i * 5).toString().padLeft(2, '0'),
-                        onSelected: (i) => setState(() => _minute = i * 5),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                context,
-                _hour == 24 ? 1440 : _hour * 60 + _minute,
-              ),
-              child: const Text('Done'),
             ),
           ],
         ),

@@ -432,15 +432,18 @@ ThemeData buildDriftTheme(ThemeId id) {
         side: hairline,
       ),
     ),
+    // Accent-tinted, matching the app toast (Sandy's pick B): an inverted
+    // white bar looked foreign on the dark themes.
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: c.text,
-      contentTextStyle: textTheme.bodyMedium?.copyWith(color: c.bg),
-      actionTextColor: c.bg,
-      closeIconColor: c.bg,
+      backgroundColor: Color.alphaBlend(c.accent.withValues(alpha: 0.12), c.card),
+      contentTextStyle: textTheme.bodyMedium?.copyWith(color: c.text),
+      actionTextColor: c.accent,
+      closeIconColor: c.textSecondary,
       behavior: SnackBarBehavior.floating,
       elevation: 0,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        side: BorderSide(color: c.accent.withValues(alpha: 0.45)),
       ),
     ),
     inputDecorationTheme: InputDecorationThemeData(

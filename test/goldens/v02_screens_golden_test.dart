@@ -75,15 +75,50 @@ void main() {
     });
   }
 
+  /// Friday 16 October, a weekday with the sample blocks: apps nobody has
+  /// ruled on yet in Meetings and Family, so Not sorted has guesses both
+  /// ways.
+  Future<void> moreUnsorted(AppServices s) async {
+    final d = DateTime(2026, 10, 16);
+    DateTime at(int h, int m) => DateTime(d.year, d.month, d.day, h, m);
+    await s.sessions.replaceDay(
+      d,
+      DateTime(d.year, d.month, d.day + 1),
+      [
+        Session(p: 'com.example.chat', start: at(13, 5), end: at(13, 20)),
+        Session(p: 'com.example.notes', start: at(13, 25), end: at(13, 50)),
+        Session(p: 'com.example.video', start: at(19, 0), end: at(19, 40)),
+        Session(p: 'com.example.music', start: at(20, 0), end: at(20, 30)),
+      ],
+      const [],
+    );
+  }
+
+  Future<void> openNotSorted(WidgetTester tester) async {
+    await tester.tap(find.textContaining('Not sorted'));
+    await tester.pumpAndSettle();
+  }
+
   for (final theme in [ThemeId.mono, ThemeId.cleanLight]) {
-    testWidgets('learned rules, ${theme.key}', (tester) async {
+    testWidgets('learned rules, not sorted, ${theme.key}', (tester) async {
       final (s, settings) = await setup(theme);
       await moreRules(s);
+      await moreUnsorted(s);
       await pumpGolden(tester, withProviders(s, settings, const RulesScreen()), theme: theme);
+      await openNotSorted(tester);
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/rules_${theme.key}.png'));
       await s.db.close();
     });
   }
+
+  testWidgets('learned rules, sorted, mono', (tester) async {
+    final (s, settings) = await setup(ThemeId.mono);
+    await moreRules(s);
+    await moreUnsorted(s);
+    await pumpGolden(tester, withProviders(s, settings, const RulesScreen()));
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/rules_sorted_mono.png'));
+    await s.db.close();
+  });
 
   testWidgets('ask sheet, small screen with large text', (tester) async {
     final (s, settings) = await setup(ThemeId.mono);
@@ -95,12 +130,14 @@ void main() {
   testWidgets('learned rules, small screen with large text', (tester) async {
     final (s, settings) = await setup(ThemeId.mono);
     await moreRules(s);
+    await moreUnsorted(s);
     await pumpGolden(
       tester,
       withProviders(s, settings, const RulesScreen()),
       size: const Size(320, 640),
       textScale: 1.3,
     );
+    await openNotSorted(tester);
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/rules_mono_small_1_3.png'));
     await s.db.close();
   });
