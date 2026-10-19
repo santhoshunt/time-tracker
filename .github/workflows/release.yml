@@ -101,6 +101,23 @@ jobs:
           code=$(sed -n 's/^version: [0-9.]*+\([0-9]*\).*/\1/p' pubspec.yaml)
           "$BT/aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | head -1 | grep -q "package: name='io.github.santhoshunt.drift' versionCode='$code' "
 
+      # Plugins that call Kotlin by name through JNI break when R8 renames
+      # or removes the target (shared_preferences_android 2.5 did, and the
+      # app could not start). Shrinking is off; this proves the classes
+      # reached the APK under their real names.
+      - name: Verify classes called by name are present
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          mkdir -p dexcheck
+          unzip -o -q build/app/outputs/flutter-apk/app-release.apk 'classes*.dex' -d dexcheck
+          for d in dexcheck/classes*.dex; do "$BT/dexdump" "$d"; done > dexcheck/all.txt
+          grep -q "Lio/flutter/plugins/sharedpreferences/SharedPreferencesApiRegistrar;" dexcheck/all.txt
+          # The exact signature the plugin's JNI call looks up; R8 had both
+          # removed the method and renamed kotlin.coroutines.Continuation.
+          grep -A1 "name          : 'getAll'" dexcheck/all.txt | grep -q "(Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;"
+          grep -q "Lio/github/santhoshunt/drift/UsageBufferWorker;" dexcheck/all.txt
+          grep -q "Landroidx/work/impl/WorkDatabase_Impl;" dexcheck/all.txt
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: apk
