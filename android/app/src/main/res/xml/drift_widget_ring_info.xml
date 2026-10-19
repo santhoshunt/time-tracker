@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drift score (2x2). updatePeriodMillis: a 30-minute redraw from the
+     stored snapshot, so the block underneath the ring moves on without the
+     app running. No configure step. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/drift_widget_ring_description"
+    android:initialLayout="@layout/drift_widget_ring"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:previewLayout="@layout/drift_widget_ring_preview"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

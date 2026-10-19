@@ -123,16 +123,22 @@ void main() {
       });
     });
 
-    test('diagnostics keeps all three keys', () async {
+    test('diagnostics keeps every key, background run included', () async {
       answer(usage, (call) => {
             'workerLastRunMs': 1760860800000,
             'bufferFiles': 3,
             'bufferCursorMs': null,
+            'backgroundLastRunMs': 1760860900000,
+            'backgroundLastOk': false,
+            'backgroundLastError': 'Dart run timed out',
           });
       expect(await source.diagnostics(), {
         'workerLastRunMs': 1760860800000,
         'bufferFiles': 3,
         'bufferCursorMs': null,
+        'backgroundLastRunMs': 1760860900000,
+        'backgroundLastOk': false,
+        'backgroundLastError': 'Dart run timed out',
       });
     });
 
@@ -214,5 +220,8 @@ Future<void> _expectDefaults(UsageSource source) async {
     'workerLastRunMs': null,
     'bufferFiles': 0,
     'bufferCursorMs': null,
+    'backgroundLastRunMs': null,
+    'backgroundLastOk': null,
+    'backgroundLastError': null,
   });
 }

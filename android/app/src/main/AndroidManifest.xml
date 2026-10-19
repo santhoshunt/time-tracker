@@ -172,6 +172,42 @@
         <receiver
             android:name=".NudgeActionReceiver"
             android:exported="false"/>
+        <!-- Home-screen widgets (DriftWidgets.kt). Exported so the launcher's
+             AppWidget host reaches them; they only redraw from the app's own
+             snapshot. -->
+        <receiver
+            android:name=".NowWidgetProvider"
+            android:exported="true"
+            android:label="@string/drift_widget_now_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/drift_widget_now_info"/>
+        </receiver>
+        <receiver
+            android:name=".StripsWidgetProvider"
+            android:exported="true"
+            android:label="@string/drift_widget_strips_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/drift_widget_strips_info"/>
+        </receiver>
+        <receiver
+            android:name=".RingWidgetProvider"
+            android:exported="true"
+            android:label="@string/drift_widget_ring_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/drift_widget_ring_info"/>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

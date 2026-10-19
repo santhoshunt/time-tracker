@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview only: the plan strip and the actual strip over 06 to 24,
+     in the mono theme's colours. The live widget draws them as a bitmap. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="216dp"
+    android:height="38dp"
+    android:viewportWidth="216"
+    android:viewportHeight="38">
+    <!-- Plan track and blocks. -->
+    <path
+        android:fillColor="#272B30"
+        android:pathData="M3,0h210a3,3 0,0 1,0 6h-210a3,3 0,0 1,0 -6z" />
+    <path
+        android:fillColor="#E6EAF2"
+        android:pathData="M37.5,0h45a3,3 0,0 1,0 6h-45a3,3 0,0 1,0 -6z" />
+    <path
+        android:fillColor="#E6EAF2"
+        android:pathData="M99.5,0h31a3,3 0,0 1,0 6h-31a3,3 0,0 1,0 -6z" />
+    <path
+        android:fillColor="#E6EAF2"
+        android:pathData="M147.5,0h33a3,3 0,0 1,0 6h-33a3,3 0,0 1,0 -6z" />
+    <!-- Actual track and pieces, up to now (about 15:30). -->
+    <path
+        android:fillColor="#272B30"
+        android:pathData="M4,10h208a4,4 0,0 1,0 12h-208a4,4 0,0 1,0 -12z" />
+    <path
+        android:fillColor="#3DD68C"
+        android:pathData="M34.5,10h33v12h-33z" />
+    <path
+        android:fillColor="#FF6B6B"
+        android:pathData="M67.5,10h12v12h-12z" />
+    <path
+        android:fillColor="#3DD68C"
+        android:pathData="M79.5,10h6v12h-6z" />
+    <path
+        android:fillColor="#4DF5B544"
+        android:pathData="M96.5,10h18v12h-18z" />
+    <path
+        android:fillColor="#3DD68C"
+        android:pathData="M114.5,10h9v12h-9z" />
+    <!-- Now line, over a card-coloured halo. -->
+    <path
+        android:fillColor="#181B1E"
+        android:pathData="M122,0h4.5v22h-4.5z" />
+    <path
+        android:fillColor="#FF6B6B"
+        android:pathData="M123.5,0h1.5v22h-1.5z" />
+    <!-- Ticks at 06, 12, 18 and 24. -->
+    <path
+        android:fillColor="#AAB8D4"
+        android:pathData="M0,24h1v3h-1zM71.5,24h1v3h-1zM143.5,24h1v3h-1zM215,24h1v3h-1z" />
+</vector>

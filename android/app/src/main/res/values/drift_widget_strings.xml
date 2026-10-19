@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home-screen widgets' picker names and descriptions (DriftWidgets.kt).
+     A file of its own so other strings files never collide with it. -->
+<resources>
+    <string name="drift_widget_now_label">Drift now</string>
+    <string name="drift_widget_now_description">The block you are in, the time left in it, and today\'s score and drift.</string>
+    <string name="drift_widget_strips_label">Drift plan and actual</string>
+    <string name="drift_widget_strips_description">Today\'s plan above what actually happened, with the score.</string>
+    <string name="drift_widget_ring_label">Drift score</string>
+    <string name="drift_widget_ring_description">Today\'s on-track share as a ring, with the current block underneath.</string>
+</resources>

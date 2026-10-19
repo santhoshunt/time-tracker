@@ -4,6 +4,7 @@ import 'package:drift_time/domain/clock.dart';
 import 'package:drift_time/platform/icon_switcher.dart';
 import 'package:drift_time/platform/nudge_bridge.dart';
 import 'package:drift_time/providers/settings_provider.dart';
+import 'package:drift_time/services/drive_backup_service.dart';
 import 'package:drift_time/theme/drift_theme.dart';
 import 'package:drift_time/theme/theme_id.dart';
 import 'package:flutter/material.dart';
@@ -111,6 +112,7 @@ Widget withApp(
   providers: [
     Provider<AppServices>.value(value: services),
     ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+    Provider<DriveBackupService>.value(value: DriveBackupService()),
   ],
   child: Consumer<SettingsProvider>(
     builder: (context, s, _) => MaterialApp(
@@ -130,6 +132,7 @@ Widget withProviders(
   providers: [
     Provider<AppServices>.value(value: services),
     ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+    Provider<DriveBackupService>.value(value: DriveBackupService()),
   ],
   child: child,
 );

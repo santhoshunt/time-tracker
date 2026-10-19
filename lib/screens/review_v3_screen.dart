@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -20,10 +21,18 @@ import '../widgets/score_card.dart' show formatMinutes;
 /// forward, never past the current one; the chevrons do the same, and a
 /// "Back to this week" pill returns to the current period.
 class ReviewV3Screen extends StatefulWidget {
-  const ReviewV3Screen({super.key, this.firstWeekday = DateTime.monday});
+  const ReviewV3Screen({
+    super.key,
+    this.firstWeekday = DateTime.monday,
+    this.openDay,
+  });
 
   /// The day weeks start on, [DateTime.monday] to [DateTime.sunday].
   final int firstWeekday;
+
+  /// Set by the home shell when an evening summary is tapped: the screen
+  /// opens that day in the Day view.
+  final ValueListenable<DateTime?>? openDay;
 
   @override
   State<ReviewV3Screen> createState() => _ReviewV3ScreenState();
@@ -128,10 +137,20 @@ class _ReviewV3ScreenState extends State<ReviewV3Screen>
     _tabs = TabController(length: ReviewPeriod.values.length, vsync: this)
       ..addListener(_onTab);
     _services.revision.addListener(_onRevision);
+    widget.openDay?.addListener(_onOpenDay);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onOpenDay());
+  }
+
+  void _onOpenDay() {
+    final day = widget.openDay?.value;
+    if (!mounted || day == null) return;
+    _tabs.index = ReviewPeriod.day.index;
+    _open(ReviewPeriod.day, day);
   }
 
   @override
   void dispose() {
+    widget.openDay?.removeListener(_onOpenDay);
     _services.revision.removeListener(_onRevision);
     _tabs.dispose();
     for (final c in _controllers) {

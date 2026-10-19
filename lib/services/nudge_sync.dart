@@ -59,11 +59,17 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
 /// never reads half a file) and starts or stops the service to match the
 /// settings. Failures are logged: a missed sync only means the service
 /// works from the previous snapshot until the next one.
+///
+/// [startService] false writes the snapshot only, for background runs
+/// (lib/background.dart): Android 12+ refuses a foreground-service start
+/// from the background, and a stop there would undo the user's choice.
+/// The app's own isolate starts and stops the service.
 Future<void> syncNudges(
   AppServices s,
   SettingsProvider settings,
   DriftColors colors, {
   Future<Directory> Function()? directory,
+  bool startService = true,
 }) async {
   try {
     final snapshot = await buildNudgeSnapshot(s, settings, colors);
@@ -73,6 +79,7 @@ Future<void> syncNudges(
     await tmp.writeAsString(jsonEncode(snapshot.toJson()), flush: true);
     await tmp.rename(target.path);
 
+    if (!startService) return;
     if (settings.nudgesEnabled && await s.usage.hasUsageAccess()) {
       await s.nudges.startService();
     } else {

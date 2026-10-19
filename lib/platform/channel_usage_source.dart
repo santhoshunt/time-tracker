@@ -71,6 +71,9 @@ class ChannelUsageSource implements UsageSource {
       'workerLastRunMs': raw?['workerLastRunMs'] as int?,
       'bufferFiles': raw?['bufferFiles'] as int? ?? 0,
       'bufferCursorMs': raw?['bufferCursorMs'] as int?,
+      'backgroundLastRunMs': raw?['backgroundLastRunMs'] as int?,
+      'backgroundLastOk': raw?['backgroundLastOk'] as bool?,
+      'backgroundLastError': raw?['backgroundLastError'] as String?,
     };
   }
 

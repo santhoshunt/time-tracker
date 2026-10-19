@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'app_services.dart';
+import 'platform/background_bridge.dart';
 import 'providers/settings_provider.dart';
 import 'theme/drift_theme.dart';
 import 'theme/theme_id.dart';
@@ -46,6 +47,15 @@ Future<BootResult> realBoot(void Function(String label) onStep) async {
   final settings = SettingsProvider();
   late AppServices services;
   final steps = [
+    // A background run in a headless engine may hold the database; opening
+    // it beside that run would let the two overwrite each other. Android
+    // stops the run after 60 s, so this can take that long, hence its own
+    // limit.
+    BootStep(
+      'Finishing a background update',
+      () => BackgroundBridge.instance.awaitIdle(),
+      limit: const Duration(seconds: 75),
+    ),
     BootStep('Reading your settings', settings.load),
     BootStep('Opening your data', () async => services = await AppServices.open()),
   ];

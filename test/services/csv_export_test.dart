@@ -62,7 +62,7 @@ void main() {
     await seedSampleDay(s, testNow);
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Export to CSV'));
+    await tester.scrollUntilVisible(find.text('Export to CSV'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Export to CSV'));
     await tester.pumpAndSettle();
@@ -73,7 +73,7 @@ void main() {
     usage.saveFails = true;
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Export to CSV'));
+    await tester.scrollUntilVisible(find.text('Export to CSV'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Export to CSV'));
     await tester.pumpAndSettle();
@@ -83,7 +83,7 @@ void main() {
   testWidgets('week start can be Sunday and survives a restart', (tester) async {
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Week starts on'));
+    await tester.scrollUntilVisible(find.text('Week starts on'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Week starts on'));
     await tester.pumpAndSettle();

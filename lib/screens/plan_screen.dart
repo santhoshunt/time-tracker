@@ -1,14 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 
 import '../app_services.dart';
 import '../domain/models.dart';
 import '../domain/plan_resolver.dart';
+import '../providers/settings_provider.dart';
 import '../theme/drift_theme.dart';
 import '../widgets/plan_timeline.dart';
+import '../widgets/plan_week_view.dart';
 import '../widgets/undo_snackbar.dart';
 import 'block_editor_screen.dart';
 
@@ -21,6 +23,11 @@ import 'block_editor_screen.dart';
 /// screens, while this tab is where the plan is changed. Past dates can
 /// still be edited, but only through one-off blocks (the editor enforces
 /// that), so a repeating block's other days are never rewritten from here.
+///
+/// A Day / Week switch in the header swaps the day for [PlanWeekView]:
+/// the week holding the selected date, with "Copy to next week", "Fill
+/// weekends", and holding a day to copy it to other days. Every week
+/// action writes one-off blocks only and offers Undo.
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
 
@@ -37,6 +44,19 @@ class _PlanScreenState extends State<PlanScreen> {
   List<PlanBlock> _all = const [];
   List<PlanTemplate> _templates = const [];
   ScrollController? _strip;
+
+  /// Whether the Week view is showing instead of the day.
+  bool _week = false;
+
+  /// Days the strip runs past today + 6, so a later date picked in the
+  /// Week view still has its pill.
+  int _stripExtra = 0;
+
+  /// The strip's day width from its last layout.
+  double _stripItemWidth = 0;
+
+  /// True while a week action is writing, so a second tap waits its turn.
+  bool _busy = false;
 
   @override
   void initState() {
@@ -266,109 +286,567 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
+  // Week view.
+
+  /// Whole calendar days from [a] to [b], counted on UTC dates so a
+  /// daylight-saving change never makes a day 23 or 25 hours long.
+  static int _daysBetween(DateTime a, DateTime b) => DateTime.utc(
+    b.year,
+    b.month,
+    b.day,
+  ).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
+
+  static DateTime _addDays(DateTime d, int n) =>
+      DateTime(d.year, d.month, d.day + n);
+
+  /// The seven days of the week holding [date], from [firstWeekday].
+  static List<DateTime> _weekDays(DateTime date, int firstWeekday) {
+    final start = planWeekStart(date, firstWeekday);
+    return [for (var i = 0; i < 7; i++) _addDays(start, i)];
+  }
+
+  static List<PlanBlock> _oneOffsOn(List<PlanBlock> all, String key) => [
+    for (final b in all)
+      if (b.repeatMask == 0 && b.date == key) b,
+  ];
+
+  /// Same name (as [blockKey] compares it) and the same times.
+  static bool _sameSlot(PlanBlock a, PlanBlock b) =>
+      blockKey(a.name) == blockKey(b.name) &&
+      a.startMin == b.startMin &&
+      a.endMin == b.endMin;
+
+  /// What a block looks like on its day, without its row id, for telling
+  /// whether an edit would change anything.
+  static String _shape(PlanBlock b) =>
+      '${b.name}|${b.startMin}|${b.endMin}|${b.colorIdx}|${b.anyApp}|${b.date}';
+
+  static bool _sameShapes(List<PlanBlock> a, List<PlanBlock> b) {
+    if (a.length != b.length) return false;
+    final x = a.map(_shape).toList()..sort();
+    final y = b.map(_shape).toList()..sort();
+    for (var i = 0; i < x.length; i++) {
+      if (x[i] != y[i]) return false;
+    }
+    return true;
+  }
+
+  void _setWeek(bool week) {
+    if (week == _week) return;
+    setState(() {
+      _week = week;
+      if (!week) _resetStrip();
+    });
+  }
+
+  /// Leaves the Week view for [day]'s Day view.
+  void _openDay(DateTime day) => setState(() {
+    _date = day;
+    _week = false;
+    _resetStrip();
+  });
+
+  void _shiftWeek(int weeks) =>
+      setState(() => _date = _addDays(_date, weeks * 7));
+
+  /// Rebuilds the date strip around [_date] the next time the Day view
+  /// lays out. Only called while the strip is off screen (in the Week
+  /// view), so its controller is detached and safe to drop.
+  void _resetStrip() {
+    _strip?.dispose();
+    _strip = null;
+    _stripExtra = math.max(0, _daysBetween(_addDays(_today, 6), _date));
+  }
+
+  /// Where the strip opens: today first, as always, unless [_date] is
+  /// outside that first page; then [_date] is brought on screen.
+  double _stripOffset(DateTime today, double itemWidth, int count) {
+    final first = _addDays(today, -PlanScreen.pastDays);
+    final index = _daysBetween(first, _date);
+    if (index >= PlanScreen.pastDays && index < PlanScreen.pastDays + 7) {
+      return PlanScreen.pastDays * itemWidth;
+    }
+    return index.clamp(0, count - 7) * itemWidth;
+  }
+
+  /// Runs a week action unless one is already writing.
+  Future<void> _guarded(Future<void> Function() action) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await action();
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Deletes [remove], inserts [add], bumps, and offers an Undo that puts
+  /// [remove] back and takes [add] out again.
+  Future<void> _applyEdit(
+    ScaffoldMessengerState messenger, {
+    required List<PlanBlock> remove,
+    required List<PlanBlock> add,
+    required String message,
+    required IconData icon,
+  }) async {
+    final plans = _services.plans;
+    for (final b in remove) {
+      await plans.deleteBlock(b.id!);
+    }
+    final added = <int>[for (final b in add) await plans.insertBlock(b)];
+    _services.bump();
+    showAppToastOn(
+      messenger,
+      message,
+      tone: AppToastTone.change,
+      icon: icon,
+      actionLabel: 'Undo',
+      onAction: () async {
+        for (final id in added) {
+          await plans.deleteBlock(id);
+        }
+        for (final b in remove) {
+          await plans.insertBlock(b);
+        }
+        _services.bump();
+      },
+    );
+  }
+
+  /// Copies each day's one-off blocks to the same weekday next week,
+  /// replacing that day's one-offs. Repeating blocks already repeat, so
+  /// they are left alone. A day with nothing to copy leaves next week's
+  /// day as it is, so a plan already made there (a dentist next Tuesday)
+  /// is never wiped by an empty day this week.
+  Future<void> _copyToNextWeek(List<DateTime> days, int firstWeekday) =>
+      _guarded(() async {
+        final messenger = ScaffoldMessenger.of(context);
+        final all = await _services.plans.allBlocks();
+        final remove = <PlanBlock>[];
+        final add = <PlanBlock>[];
+        var sources = 0;
+        for (final d in days) {
+          final source = _oneOffsOn(all, dateKey(d));
+          if (source.isEmpty) continue;
+          sources += source.length;
+          final target = dateKey(_addDays(d, 7));
+          remove.addAll(_oneOffsOn(all, target));
+          add.addAll([for (final b in source) _oneOff(b, target)]);
+        }
+        if (sources == 0) {
+          final anyBlocks = days.any((d) => activeBlocks(d, all).isNotEmpty);
+          showAppToastOn(
+            messenger,
+            anyBlocks
+                ? 'Nothing to copy: this week has only repeating blocks'
+                : 'This week has no blocks to copy',
+          );
+          return;
+        }
+        if (_sameShapes(remove, add)) {
+          showAppToastOn(messenger, 'Next week already matches this week');
+          return;
+        }
+        final next = planWeekLabel(_addDays(days.first, 7), _today);
+        await _applyEdit(
+          messenger,
+          remove: remove,
+          add: add,
+          message: 'Copied this week to $next',
+          icon: Icons.content_copy_outlined,
+        );
+      });
+
+  /// Applies a picked template to the week's Saturday and Sunday as
+  /// one-offs, replacing their one-offs. A template block that a
+  /// repeating block already covers on that day is not added again.
+  Future<void> _fillWeekends(List<DateTime> days) => _guarded(() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final templates = await _services.plans.allTemplates();
+    if (!mounted) return;
+    if (templates.isEmpty) {
+      showAppToastOn(
+        messenger,
+        'Save a template first',
+        icon: Icons.bookmark_add_outlined,
+      );
+      return;
+    }
+    final weekend = [
+      for (final d in days)
+        if (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) d,
+    ];
+    final template = await showFillWeekendsSheet(
+      context,
+      templates: templates,
+      days: weekend,
+    );
+    if (template == null || !mounted) return;
+    final all = await _services.plans.allBlocks();
+    final remove = <PlanBlock>[];
+    final add = <PlanBlock>[];
+    for (final d in weekend) {
+      final key = dateKey(d);
+      final repeating = [
+        for (final b in activeBlocks(d, all))
+          if (b.repeatMask != 0) b,
+      ];
+      remove.addAll(_oneOffsOn(all, key));
+      add.addAll([
+        for (final b in template.blocks)
+          if (!repeating.any((r) => _sameSlot(r, b))) _oneOff(b, key),
+      ]);
+    }
+    await _applyEdit(
+      messenger,
+      remove: remove,
+      add: add,
+      message:
+          'Applied "${template.name}" to ${weekend.map(shortDayLabel).join(' and ')}',
+      icon: Icons.weekend_outlined,
+    );
+  });
+
+  /// Copies [day]'s blocks to the days picked in a sheet as one-offs,
+  /// replacing their one-offs. A block is skipped on a day where the same
+  /// repeating block (or one with the same name and times) already
+  /// applies, so nothing shows twice.
+  Future<void> _copyDay(DateTime day, List<DateTime> days) => _guarded(() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final before = await _services.plans.allBlocks();
+    if (!mounted) return;
+    if (activeBlocks(day, before).isEmpty) {
+      showAppToastOn(messenger, '${shortDayLabel(day)} has no blocks to copy');
+      return;
+    }
+    final targets = await showCopyDaySheet(
+      context,
+      source: day,
+      targets: [
+        for (final d in days)
+          if (d != day) d,
+      ],
+    );
+    if (targets == null || targets.isEmpty || !mounted) return;
+    final all = await _services.plans.allBlocks();
+    final source = [
+      for (final b in activeBlocks(day, all))
+        if (b.endMin > b.startMin) b,
+    ];
+    final remove = <PlanBlock>[];
+    final add = <PlanBlock>[];
+    for (final t in targets) {
+      final key = dateKey(t);
+      final repeating = [
+        for (final b in activeBlocks(t, all))
+          if (b.repeatMask != 0) b,
+      ];
+      remove.addAll(_oneOffsOn(all, key));
+      add.addAll([
+        for (final b in source)
+          if (!repeating.any((r) => r.id == b.id || _sameSlot(r, b)))
+            _oneOff(b, key),
+      ]);
+    }
+    await _applyEdit(
+      messenger,
+      remove: remove,
+      add: add,
+      message: targets.length == 1
+          ? 'Copied ${shortDayLabel(day)} to ${shortDayLabel(targets.single)}'
+          : 'Copied ${shortDayLabel(day)} to ${targets.length} days',
+      icon: Icons.content_copy_outlined,
+    );
+  });
+
   @override
   Widget build(BuildContext context) {
     final c = context.drift;
     final now = _services.clock.now();
     final today = localDayStart(now);
     final isToday = _date == today;
-    final blocks = _dayBlocks;
-    final hintStart = _suggestedStart(blocks, isToday);
+    final firstWeekday = context.select<SettingsProvider, int>(
+      (s) => s.firstWeekday,
+    );
+    final nowMinute = now.hour * 60 + now.minute;
+
+    final List<Widget> body;
+    if (_week) {
+      final days = _weekDays(_date, firstWeekday);
+      body = [
+        _header(context, today, isToday, days, firstWeekday),
+        _weekChips(days, firstWeekday),
+        Divider(height: 1, color: c.line),
+        Expanded(
+          child: PlanWeekView(
+            days: days,
+            blocks: _all,
+            today: today,
+            nowMinute: nowMinute,
+            onDayTap: _openDay,
+            onDayLongPress: (d) => _copyDay(d, days),
+          ),
+        ),
+      ];
+    } else {
+      final blocks = _dayBlocks;
+      final hintStart = _suggestedStart(blocks, isToday);
+      body = [
+        _header(context, today, isToday, null, firstWeekday),
+        _dateStrip(context, today),
+        _chips(context),
+        Divider(height: 1, color: c.line),
+        Expanded(
+          child: PlanTimeline(
+            blocks: blocks,
+            nowMinute: isToday ? nowMinute : null,
+            hint: hintStart == null
+                ? null
+                : (hintStart, math.min(hintStart + 60, 1440)),
+            onBlockTap: (b) => _openEditor(block: b),
+            onCreate: (s, e) => _openEditor(start: s, end: e),
+            onHintTap: (s, e) => _openEditor(start: s, end: e),
+            bottomPadding: 88,
+          ),
+        ),
+      ];
+    }
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addBlock,
-        tooltip: 'Add a block',
-        shape: const CircleBorder(),
-        backgroundColor: c.accent,
-        foregroundColor: c.onAccent,
-        elevation: 2,
-        highlightElevation: 4,
-        child: const Icon(Icons.add),
-      ),
+      // The week has no single day to add to, and the button would cover
+      // the bottom of the last column.
+      floatingActionButton: _week
+          ? null
+          : FloatingActionButton(
+              onPressed: _addBlock,
+              tooltip: 'Add a block',
+              shape: const CircleBorder(),
+              backgroundColor: c.accent,
+              foregroundColor: c.onAccent,
+              elevation: 2,
+              highlightElevation: 4,
+              child: const Icon(Icons.add),
+            ),
       body: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _header(context, today, isToday),
-            _dateStrip(context, today),
-            _chips(context),
-            Divider(height: 1, color: c.line),
-            Expanded(
-              child: PlanTimeline(
-                blocks: blocks,
-                nowMinute: isToday ? now.hour * 60 + now.minute : null,
-                hint: hintStart == null
-                    ? null
-                    : (hintStart, math.min(hintStart + 60, 1440)),
-                onBlockTap: (b) => _openEditor(block: b),
-                onCreate: (s, e) => _openEditor(start: s, end: e),
-                onHintTap: (s, e) => _openEditor(start: s, end: e),
-                bottomPadding: 88,
-              ),
-            ),
-          ],
+          children: body,
         ),
       ),
     );
   }
 
-  Widget _header(BuildContext context, DateTime today, bool isToday) {
+  /// "Plan Monday" over the date, or "Plan this week" over the week's
+  /// range with arrows, and the Day / Week switch. The second line keeps
+  /// one height in both views, so switching never moves the page.
+  Widget _header(
+    BuildContext context,
+    DateTime today,
+    bool isToday,
+    List<DateTime>? week,
+    int firstWeekday,
+  ) {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
-    final dateText = DateFormat('d MMMM').format(_date);
-    final subtitle = isToday
-        ? 'Today, $dateText'
-        : _date.isBefore(today)
-        ? '$dateText, changes apply to this day only'
-        : dateText;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      const TextSpan(text: 'Plan '),
-                      TextSpan(
-                        text: _dayName(_date),
-                        style: TextStyle(color: c.textSecondary),
-                      ),
-                    ],
-                  ),
-                  style: text.headlineSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: text.bodyMedium?.copyWith(color: c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          if (!isToday)
-            TextButton(
-              onPressed: () {
+    final String title;
+    final String subtitle;
+    final (String, VoidCallback)? jump;
+    if (week == null) {
+      title = _dayName(_date);
+      final dateText = DateFormat('d MMMM').format(_date);
+      subtitle = isToday
+          ? 'Today, $dateText'
+          : _date.isBefore(today)
+          ? '$dateText, changes apply to this day only'
+          : dateText;
+      jump = isToday
+          ? null
+          : (
+              'Today',
+              () {
                 setState(() => _date = today);
                 final strip = _strip;
                 if (strip != null && strip.hasClients) {
                   strip.animateTo(
-                    strip.position.maxScrollExtent,
+                    PlanScreen.pastDays * _stripItemWidth,
                     duration: const Duration(milliseconds: 250),
                     curve: Curves.easeOut,
                   );
                 }
               },
-              child: const Text('Today'),
+            );
+    } else {
+      final offset =
+          _daysBetween(
+            planWeekStart(today, firstWeekday),
+            week.first,
+          ) ~/
+          7;
+      title = switch (offset) {
+        0 => 'this week',
+        1 => 'next week',
+        -1 => 'last week',
+        > 1 => 'in $offset weeks',
+        _ => '${-offset} weeks ago',
+      };
+      subtitle = planWeekLabel(week.first, today);
+      jump = offset == 0
+          ? null
+          : ('This week', () => setState(() => _date = today));
+    }
+    const compact = ButtonStyle(
+      visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final titleStyle = text.headlineSmall!;
+    final titleText = Text.rich(
+      TextSpan(
+        children: [
+          const TextSpan(text: 'Plan '),
+          TextSpan(text: title, style: TextStyle(color: c.textSecondary)),
+        ],
+      ),
+      style: titleStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    final modeSwitch = SegmentedButton<bool>(
+      showSelectedIcon: false,
+      style: compact,
+      segments: const [
+        ButtonSegment(value: false, label: Text('Day')),
+        ButtonSegment(value: true, label: Text('Week')),
+      ],
+      selected: {_week},
+      onSelectionChanged: (s) => _setWeek(s.first),
+    );
+    final jumpButton = jump == null
+        ? null
+        : TextButton(style: compact, onPressed: jump.$2, child: Text(jump.$1));
+    final subtitleStyle = text.bodyMedium?.copyWith(color: c.textSecondary);
+    // The week's range stays on one line, shrinking if it must, so the
+    // header keeps its height from week to week.
+    final subtitleText = week == null
+        ? Text(subtitle, style: subtitleStyle)
+        : FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(subtitle, style: subtitleStyle, maxLines: 1),
+          );
+    Widget second({required bool withJump}) => ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 40),
+      child: Row(
+        children: [
+          Expanded(child: subtitleText),
+          if (withJump && jumpButton != null) jumpButton,
+          if (week != null) ...[
+            IconButton(
+              tooltip: 'Previous week',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _shiftWeek(-1),
+              icon: const Icon(Icons.chevron_left),
             ),
+            IconButton(
+              tooltip: 'Next week',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _shiftWeek(1),
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 2),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // The switch sits beside the title when the longest title this
+          // view can show fits next to it, and on its own line under the
+          // date otherwise (small phones, large text). Deciding on the
+          // longest title, not the current one, keeps the header the same
+          // height while moving between days or weeks.
+          final scaler = MediaQuery.textScalerOf(context);
+          double width(String s, TextStyle? style) =>
+              (TextPainter(
+                    text: TextSpan(text: s, style: style),
+                    textDirection: TextDirection.ltr,
+                    textScaler: scaler,
+                    maxLines: 1,
+                  )..layout())
+                  .width;
+          final candidates = week == null
+              ? [
+                  for (var i = 0; i < 7; i++)
+                    _dayName(_addDays(DateTime(2026, 10, 19), i)),
+                ]
+              : const ['this week', 'next week', 'last week'];
+          final longest = candidates
+              .map((t) => width('Plan $t', titleStyle))
+              .reduce(math.max);
+          final labelStyle = Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500);
+          // Each segment pads its label by 12 on both sides, plus borders.
+          final switchWidth =
+              width('Day', labelStyle) + width('Week', labelStyle) + 50;
+          final inline = longest + 12 + switchWidth <= box.maxWidth;
+          if (inline) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: titleText),
+                    const SizedBox(width: 12),
+                    modeSwitch,
+                  ],
+                ),
+                second(withJump: true),
+              ],
+            );
+          }
+          // Stacked: the jump back to today or this week moves onto the
+          // switch's line, leaving the date line room for the date.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              titleText,
+              second(withJump: false),
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 6),
+                child: Row(
+                  children: [
+                    modeSwitch,
+                    const Spacer(),
+                    ?jumpButton,
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _weekChips(List<DateTime> days, int firstWeekday) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Row(
+        children: [
+          _PlanChip(
+            icon: Icons.content_copy_outlined,
+            label: 'Copy to next week',
+            onPressed: () => _copyToNextWeek(days, firstWeekday),
+          ),
+          const SizedBox(width: 8),
+          _PlanChip(
+            icon: Icons.weekend_outlined,
+            label: 'Fill weekends',
+            onPressed: () => _fillWeekends(days),
+          ),
         ],
       ),
     );
@@ -377,22 +855,26 @@ class _PlanScreenState extends State<PlanScreen> {
   Widget _dateStrip(BuildContext context, DateTime today) {
     final scaler = MediaQuery.textScalerOf(context);
     final height = 22 + scaler.scale(11) * 16 / 11 + scaler.scale(16) * 24 / 16;
+    final count = PlanScreen.pastDays + 7 + _stripExtra;
     return SizedBox(
       height: height,
       child: LayoutBuilder(
         builder: (context, box) {
           const pad = 12.0;
           final itemWidth = (box.maxWidth - pad * 2) / 7;
+          _stripItemWidth = itemWidth;
           // Today is the first visible day; earlier days sit to the left.
+          // A date picked in the Week view off that page is shown instead.
           final strip = _strip ??= ScrollController(
-            initialScrollOffset: PlanScreen.pastDays * itemWidth,
+            keepScrollOffset: false,
+            initialScrollOffset: _stripOffset(today, itemWidth, count),
           );
           return ListView.builder(
             controller: strip,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: pad),
             itemExtent: itemWidth,
-            itemCount: PlanScreen.pastDays + 7,
+            itemCount: count,
             itemBuilder: (context, i) {
               final day = DateTime(
                 today.year,

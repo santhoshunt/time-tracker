@@ -32,9 +32,17 @@ import java.util.concurrent.Executors
  * Kotlin only reports what Android recorded. Sessions, idle time and
  * verdicts are worked out in Dart. Without usage access every query
  * answers empty rather than failing, so the UI can show the setup step.
+ *
+ * Serves the app's engine and the headless background engine
+ * (DriftBackground). Every query runs on [context]; only the calls that
+ * open a settings screen need [activity], and do nothing without one.
  */
-class UsageBridge(private val activity: Activity) {
+class UsageBridge(
+    private val context: Context,
+    private val activity: Activity? = null,
+) {
     companion object {
+        const val CHANNEL = "drift/usage"
         const val PREFS = "drift_native"
         const val KEY_CURSOR = "buffer_cursor_ms"
         const val KEY_LAST_RUN = "worker_last_run_ms"
@@ -132,7 +140,7 @@ class UsageBridge(private val activity: Activity) {
 
     fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "hasUsageAccess" -> result.success(hasUsageAccess(activity))
+            "hasUsageAccess" -> result.success(hasUsageAccess(context))
             "openUsageAccessSettings" -> {
                 open(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                 result.success(null)
@@ -149,7 +157,7 @@ class UsageBridge(private val activity: Activity) {
                 if (from == null || to == null) {
                     result.error("BAD_ARGS", "fromMs and toMs are required.", null)
                 } else {
-                    background(result) { readEvents(activity, from, to) }
+                    background(result) { readEvents(context, from, to) }
                 }
             }
             "earliestEventMs" -> background(result) { earliestEventMs() }
@@ -158,7 +166,7 @@ class UsageBridge(private val activity: Activity) {
                 val p = call.argument<String>("p")
                 background(result) { p?.let(::appIcon) }
             }
-            "homePackages" -> background(result) { homePackages(activity) }
+            "homePackages" -> background(result) { homePackages(context) }
             "drainBuffer" -> background(result) { drainBuffer() }
             "deleteBuffer" -> {
                 val paths = call.argument<List<String>>("paths") ?: emptyList()
@@ -214,7 +222,7 @@ class UsageBridge(private val activity: Activity) {
                 put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Drift")
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
-            val resolver = activity.contentResolver
+            val resolver = context.contentResolver
             val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 ?: error("Android did not create the file")
             try {
@@ -229,25 +237,30 @@ class UsageBridge(private val activity: Activity) {
             }
             return "Downloads/Drift/$name"
         }
-        val dir = activity.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-            ?: activity.filesDir
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: context.filesDir
         val file = File(dir, name)
         file.writeText(text)
         return file.path
     }
 
     /** Some ROMs lack these settings screens; a bare startActivity would
-     * throw and the tap would do nothing visible. */
-    private fun open(intent: Intent): Boolean = try {
-        activity.startActivity(intent)
-        true
-    } catch (_: Exception) {
-        false
+     * throw and the tap would do nothing visible. Without an Activity (the
+     * headless engine) nothing opens: no screen should appear from a
+     * background job. */
+    private fun open(intent: Intent): Boolean {
+        val host = activity ?: return false
+        return try {
+            host.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun isIgnoringBatteryOptimizations(): Boolean {
-        val pm = activity.getSystemService(Context.POWER_SERVICE) as PowerManager
-        return pm.isIgnoringBatteryOptimizations(activity.packageName)
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
     }
 
     /** The system's one-tap exemption dialog; the full list as a fallback. */
@@ -255,7 +268,7 @@ class UsageBridge(private val activity: Activity) {
         val asked = open(
             Intent(
                 Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                Uri.parse("package:${activity.packageName}")
+                Uri.parse("package:${context.packageName}")
             )
         )
         if (!asked) open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
@@ -264,9 +277,9 @@ class UsageBridge(private val activity: Activity) {
     /** The oldest event Android still holds in the last 10 days, of any
      * type, or null. Only the first event is read. */
     private fun earliestEventMs(): Long? {
-        if (!hasUsageAccess(activity)) return null
+        if (!hasUsageAccess(context)) return null
         val now = System.currentTimeMillis()
-        val usm = activity.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val events = try {
             usm.queryEvents(now - TEN_DAYS_MS, now)
         } catch (_: SecurityException) {
@@ -281,11 +294,11 @@ class UsageBridge(private val activity: Activity) {
     /** One entry per package with a launcher activity. Needs the
      * MAIN/LAUNCHER <queries> entry on Android 11 and later. */
     private fun listApps(): List<Map<String, Any?>> {
-        val pm = activity.packageManager
+        val pm = context.packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val seen = HashSet<String>()
         val out = ArrayList<Map<String, Any?>>()
-        for (info in resolve(activity, launcher)) {
+        for (info in resolve(context, launcher)) {
             val app = info.activityInfo?.applicationInfo ?: continue
             if (!seen.add(app.packageName)) continue
             out.add(
@@ -303,7 +316,7 @@ class UsageBridge(private val activity: Activity) {
      * gone. toBitmap also draws adaptive icons, which have no bitmap. */
     private fun appIcon(p: String): ByteArray? {
         val drawable = try {
-            activity.packageManager.getApplicationIcon(p)
+            context.packageManager.getApplicationIcon(p)
         } catch (_: PackageManager.NameNotFoundException) {
             return null
         }
@@ -316,7 +329,7 @@ class UsageBridge(private val activity: Activity) {
     /** Finished buffer files, oldest first. A file the worker is still
      * writing ends in .tmp and is not listed. */
     private fun drainBuffer(): List<String> {
-        val files = bufferDir(activity).listFiles() ?: return emptyList()
+        val files = bufferDir(context).listFiles() ?: return emptyList()
         return files
             .filter { it.isFile && BUFFER_FILE.matches(it.name) }
             .sortedBy { it.name.substringBefore('-').toLongOrNull() ?: Long.MAX_VALUE }
@@ -327,7 +340,7 @@ class UsageBridge(private val activity: Activity) {
      * same canonical-path check UpdateInstaller.resolve makes. Anything else
      * Dart passes is ignored. */
     private fun deleteBuffer(paths: List<String>) {
-        val dir = bufferDir(activity).canonicalFile
+        val dir = bufferDir(context).canonicalFile
         for (path in paths) {
             val file = File(path).canonicalFile
             if (file.parentFile != dir || !BUFFER_FILE.matches(file.name) || !file.isFile) {
@@ -338,8 +351,8 @@ class UsageBridge(private val activity: Activity) {
     }
 
     private fun diagnostics(): Map<String, Any?> {
-        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val count = bufferDir(activity).listFiles()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val count = bufferDir(context).listFiles()
             ?.count { it.isFile && BUFFER_FILE.matches(it.name) } ?: 0
         return mapOf(
             "workerLastRunMs" to
@@ -347,6 +360,21 @@ class UsageBridge(private val activity: Activity) {
             "bufferFiles" to count,
             "bufferCursorMs" to
                 if (prefs.contains(KEY_CURSOR)) prefs.getLong(KEY_CURSOR, 0) else null,
+            // The last background Dart run (DriftBackground), so a pasted
+            // report shows whether runs happen with the app closed.
+            "backgroundLastRunMs" to
+                if (prefs.contains(DriftBackground.KEY_LAST_RUN)) {
+                    prefs.getLong(DriftBackground.KEY_LAST_RUN, 0)
+                } else {
+                    null
+                },
+            "backgroundLastOk" to
+                if (prefs.contains(DriftBackground.KEY_LAST_OK)) {
+                    prefs.getBoolean(DriftBackground.KEY_LAST_OK, false)
+                } else {
+                    null
+                },
+            "backgroundLastError" to prefs.getString(DriftBackground.KEY_LAST_ERROR, null),
         )
     }
 }

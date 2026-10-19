@@ -22,6 +22,8 @@ class SettingsProvider extends ChangeNotifier {
   static const _kQuietEnd = 'quiet_end_min_v1';
   static const _kSkippedSetup = 'setup_skipped_v1';
   static const _kWeekStart = 'week_start_v1';
+  static const _kSummaryEnabled = 'summary_enabled_v1';
+  static const _kSummaryMinute = 'summary_minute_v1';
   static const _kLastUpdateVersion = 'update_last_success_version_v1';
   static const _kLastUpdateMs = 'update_last_success_ms_v1';
 
@@ -40,8 +42,17 @@ class SettingsProvider extends ChangeNotifier {
   int _quietEndMin = 7 * 60;
   Set<String> _skippedSetup = const {};
   int _firstWeekday = DateTime.monday;
+  bool _summaryEnabled = true;
+  int _summaryMinute = 21 * 60 + 30;
 
   ThemeId get theme => _theme;
+
+  /// The evening summary notification, on by default (Sandy asked for both
+  /// live nudges and an end-of-day review).
+  bool get summaryEnabled => _summaryEnabled;
+
+  /// When the evening summary arrives, as minutes from local midnight.
+  int get summaryMinute => _summaryMinute;
 
   /// DateTime.monday or DateTime.sunday: where week reviews start.
   int get firstWeekday => _firstWeekday;
@@ -120,7 +131,27 @@ class SettingsProvider extends ChangeNotifier {
           : DateTime.monday,
       DateTime.monday,
     );
+    _summaryEnabled = _read(() => prefs.getBool(_kSummaryEnabled) ?? true, true);
+    _summaryMinute = _read(
+      () => (prefs.getInt(_kSummaryMinute) ?? 21 * 60 + 30).clamp(0, 1439),
+      21 * 60 + 30,
+    );
     notifyListeners();
+  }
+
+  Future<void> setSummaryEnabled(bool value) async {
+    if (value == _summaryEnabled) return;
+    _summaryEnabled = value;
+    notifyListeners();
+    await _persist(_kSummaryEnabled, (p) => p.setBool(_kSummaryEnabled, value));
+  }
+
+  Future<void> setSummaryMinute(int minute) async {
+    final value = minute.clamp(0, 1439);
+    if (value == _summaryMinute) return;
+    _summaryMinute = value;
+    notifyListeners();
+    await _persist(_kSummaryMinute, (p) => p.setInt(_kSummaryMinute, value));
   }
 
   Future<void> setFirstWeekday(int day) async {

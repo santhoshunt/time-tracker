@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,7 +12,14 @@ import 'screens/plan_screen.dart';
 import 'screens/review_v3_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/today_screen.dart';
+// Also keeps backgroundMain, the headless engine's entry point, in the AOT
+// build: without an import from main.dart's tree it would be dropped.
+import 'background.dart';
+import 'platform/background_bridge.dart';
 import 'services/day_loader.dart';
+import 'services/drive_backup_service.dart';
+import 'services/evening_summary.dart';
+import 'services/widget_snapshot.dart';
 import 'services/period_loader.dart';
 import 'services/nudge_sync.dart';
 import 'services/update_installer.dart';
@@ -33,6 +42,7 @@ class DriftApp extends StatelessWidget {
       providers: [
         Provider<AppServices>.value(value: services),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+        Provider<DriveBackupService>(create: (_) => DriveBackupService()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) => MaterialApp(
@@ -107,6 +117,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   bool _asking = false;
   late final AppServices _services;
   late final SettingsProvider _settings;
+  late final DriveBackupService _drive;
+  StreamSubscription<String>? _payloads;
+
+  /// The day an evening summary tap asked to open in Review.
+  final _openReviewDay = ValueNotifier<DateTime?>(null);
+
+  /// What the summary booking was last made from, so unrelated settings
+  /// changes don't rebook it.
+  (bool, int)? _bookedSummary;
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -116,9 +135,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     _services = context.read<AppServices>();
     _settings = context.read<SettingsProvider>();
+    _drive = context.read<DriveBackupService>();
     WidgetsBinding.instance.addObserver(this);
     _services.revision.addListener(_onDataChanged);
     _settings.addListener(_syncNudges);
+    _settings.addListener(_bookSummary);
+    // A background run while the app is open happens here, in this
+    // isolate, so the database never has two writers.
+    BackgroundBridge.instance.listenForRuns(
+      () => runBackgroundSteps(_services, _settings),
+    );
+    // Before the first frame, or a summary tap while the app is open is lost.
+    _payloads = BackgroundBridge.instance.launchPayloads.listen(_onPayload);
     WidgetsBinding.instance.addPostFrameCallback((_) => _onStart());
   }
 
@@ -127,6 +155,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _services.revision.removeListener(_onDataChanged);
     _settings.removeListener(_syncNudges);
+    _settings.removeListener(_bookSummary);
+    _payloads?.cancel();
+    _openReviewDay.dispose();
     super.dispose();
   }
 
@@ -135,12 +166,29 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (state != AppLifecycleState.resumed) return;
     _readAndAsk();
     runLaunchUpdateCheck(_settings, isAndroid: _isAndroid);
+    unawaited(_drive.checkAndRunScheduled(_services, _settings));
   }
 
-  /// The plan, the rules or the usage changed: refresh the badge and the
-  /// snapshot the nudge service reads.
+  /// An evening summary tap carries `review:YYYY-MM-DD`: open that day.
+  void _onPayload(String payload) {
+    final day = reviewDayOf(payload);
+    if (day == null || !mounted) return;
+    setState(() => _tab = 2);
+    _openReviewDay.value = day;
+  }
+
+  void _bookSummary() {
+    final key = (_settings.summaryEnabled, _settings.summaryMinute);
+    if (key == _bookedSummary) return;
+    _bookedSummary = key;
+    unawaited(bookNextSummary(_services, _settings));
+  }
+
+  /// The plan, the rules or the usage changed: refresh the badge, the
+  /// snapshot the nudge service reads and the home-screen widgets.
   Future<void> _onDataChanged() async {
     _syncNudges();
+    unawaited(writeWidgetSnapshot(_services, _settings));
     final day = await loadDay(_services, _services.clock.now());
     if (mounted) setState(() => _asks = day.unanswered.length);
   }
@@ -169,7 +217,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final settings = _settings;
     final messenger = ScaffoldMessenger.of(context);
     _syncNudges();
+    _bookSummary();
     _readAndAsk();
+    unawaited(_drive.checkAndRunScheduled(services, settings));
+    final cold = await BackgroundBridge.instance.takeLaunchPayload();
+    if (cold != null) _onPayload(cold);
     final message = await takeUpdateResultMessage(settings);
     if (message != null) {
       final info = await PackageInfo.fromPlatform();
@@ -195,7 +247,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         children: [
           TodayScreen(onPlan: () => setState(() => _tab = 1)),
           const PlanScreen(),
-          ReviewV3Screen(firstWeekday: context.watch<SettingsProvider>().firstWeekday),
+          ReviewV3Screen(
+            firstWeekday: context.watch<SettingsProvider>().firstWeekday,
+            openDay: _openReviewDay,
+          ),
           SettingsScreen(daysLoader: (first, last) => loadDays(_services, first, last)),
         ],
       ),

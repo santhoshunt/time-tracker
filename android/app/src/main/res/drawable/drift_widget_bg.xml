@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Drift widgets' card shape. White so DriftWidgets.kt's colour filter
+     paints it the theme's card colour exactly; each layout's default tint is
+     the mono theme's card, which the picker preview shows. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFF" />
+    <corners android:radius="16dp" />
+</shape>

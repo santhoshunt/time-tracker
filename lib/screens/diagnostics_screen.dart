@@ -76,6 +76,24 @@ Future<List<DiagnosticLine>> collectDiagnostics(
     ),
     (key: 'buffer_files', label: 'Files waiting', value: '$bufferFiles', ok: null),
     (
+      key: 'background_run',
+      label: 'Background update',
+      value: native['backgroundLastRunMs'] == null
+          ? 'never'
+          : '${ago(native['backgroundLastRunMs'] as int?)}'
+                '${native['backgroundLastOk'] == false ? ', failed' : ''}',
+      ok: native['backgroundLastRunMs'] == null
+          ? null
+          : native['backgroundLastOk'] != false,
+    ),
+    if (native['backgroundLastError'] is String)
+      (
+        key: 'background_error',
+        label: 'Background error',
+        value: native['backgroundLastError'] as String,
+        ok: false,
+      ),
+    (
       key: 'notifications',
       label: 'Notifications',
       value: notifications ? 'Allowed' : 'Off',

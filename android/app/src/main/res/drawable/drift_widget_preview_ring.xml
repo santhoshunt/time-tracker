@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview only: a score ring at 74% in the mono theme's colours.
+     The live widget draws its ring as a bitmap. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="88dp"
+    android:height="88dp"
+    android:viewportWidth="88"
+    android:viewportHeight="88">
+    <path
+        android:pathData="M44,4a40,40 0,1 1,0 80a40,40 0,1 1,0 -80"
+        android:strokeWidth="8"
+        android:strokeColor="#272B30" />
+    <!-- 74% of the circle, from 12 o'clock clockwise. -->
+    <path
+        android:pathData="M44,4A40,40 0,1 1,4.08 46.51"
+        android:strokeLineCap="round"
+        android:strokeWidth="8"
+        android:strokeColor="#3DD68C" />
+</vector>

@@ -16,6 +16,12 @@ import java.io.File
  * Scheduled from MainActivity as unique periodic work, policy KEEP, so a
  * launch never resets the schedule. WorkManager creates this class by
  * reflection; proguard-rules.pro keeps its constructor.
+ *
+ * Since v0.4.0 each run then runs Dart (DriftBackground): ingest, the
+ * widget and nudge snapshots, and the evening summary when it is due.
+ * KEEP the class name and [UNIQUE_NAME]: WorkManager stores both for work
+ * already booked on installed phones, and a rename would leave that work
+ * pointing at a class that no longer exists.
  */
 class UsageBufferWorker(
     context: Context,
@@ -26,15 +32,23 @@ class UsageBufferWorker(
         private const val DAY_MS = 24L * 60 * 60 * 1000
     }
 
+    /** The buffer file comes first and never depends on Dart, so a Dart
+     * failure can never lose events. Always success: a failed Dart run is
+     * simply redone by the next hourly run. */
     override fun doWork(): Result {
-        val context = applicationContext
+        bufferEvents(applicationContext)
+        DriftBackground.run(applicationContext, summary = false)
+        return Result.success()
+    }
+
+    private fun bufferEvents(context: Context) {
         val prefs = context.getSharedPreferences(UsageBridge.PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         if (!UsageBridge.hasUsageAccess(context)) {
             // Recorded so Diagnostics shows the job is alive; the cursor
             // stays put until access is granted.
             prefs.edit().putLong(UsageBridge.KEY_LAST_RUN, now).apply()
-            return Result.success()
+            return
         }
         removeStaleTemps(context, now)
         val cursor = prefs.getLong(UsageBridge.KEY_CURSOR, 0L)
@@ -48,15 +62,15 @@ class UsageBufferWorker(
                 // Disk full or similar: keep the cursor, so the next run
                 // covers this span again.
                 prefs.edit().putLong(UsageBridge.KEY_LAST_RUN, now).apply()
-                return Result.success()
+                return
             }
         }
-        // commit, not apply: the process may end right after this returns.
+        // commit, not apply: the process may end right after this returns,
+        // and the Dart run that follows reads the cursor's files.
         prefs.edit()
             .putLong(UsageBridge.KEY_CURSOR, to)
             .putLong(UsageBridge.KEY_LAST_RUN, now)
             .commit()
-        return Result.success()
     }
 
     /** A run killed mid-write leaves a .tmp file that nothing else

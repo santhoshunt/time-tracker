@@ -269,4 +269,42 @@ void main() {
     expect(find.text('Tuesday'), findsNothing); // Inside the "Plan Tuesday" span.
     expect(find.text('Plan Tuesday'), findsOneWidget);
   });
+
+  testWidgets('opens on the Day view and switches to Week and back', (
+    tester,
+  ) async {
+    final services = await _services();
+    await _pump(tester, services);
+
+    final toggle = tester.widget<SegmentedButton<bool>>(
+      find.byType(SegmentedButton<bool>),
+    );
+    expect(toggle.selected, {false});
+    expect(find.byType(PlanTimeline), findsOneWidget);
+
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlanTimeline), findsNothing);
+    expect(find.text('Copy to next week'), findsOneWidget);
+
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlanTimeline), findsOneWidget);
+    expect(find.text('Plan Monday'), findsOneWidget);
+    expect(find.text('Copy yesterday'), findsOneWidget);
+  });
+
+  testWidgets('Today returns from another day', (tester) async {
+    final services = await _services();
+    await _pump(tester, services);
+
+    await tester.tap(find.byKey(const ValueKey('planDay2026-10-22')));
+    await tester.pumpAndSettle();
+    expect(find.text('Plan Thursday'), findsOneWidget);
+
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.text('Plan Monday'), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
+  });
 }

@@ -7,8 +7,10 @@ import '../app_services.dart';
 import '../icons/drift_icons.dart';
 import '../providers/settings_provider.dart';
 import '../services/csv_export.dart';
+import '../services/drive_backup_service.dart';
 import '../services/update_service.dart';
 import '../theme/drift_theme.dart';
+import '../widgets/drive_backup_section.dart';
 import '../widgets/settings_group.dart';
 import '../widgets/time_wheel.dart';
 import '../widgets/undo_snackbar.dart';
@@ -153,6 +155,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  static String _hm(int m) =>
+      '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+
+  /// The summary time, on the same wheel as the block editor. Android may
+  /// deliver it a few minutes late, hence "Around" in the row.
+  Future<void> _pickSummaryTime() async {
+    final settings = context.read<SettingsProvider>();
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => TimeWheelSheet(
+        title: 'Evening summary at',
+        initial: settings.summaryMinute,
+        allowMidnightEnd: false,
+      ),
+    );
+    if (picked == null) return;
+    await settings.setSummaryMinute(picked);
+    if (!settings.summaryEnabled) await settings.setSummaryEnabled(true);
+  }
+
   /// Quiet hours option A: From and Until wheels in one sheet, the same
   /// wheels as the block editor (the Material clock dial was hard to read).
   Future<void> _pickQuietHours() async {
@@ -263,6 +286,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
                 SettingsRow(
+                  title: 'Evening summary',
+                  subtitle: settings.summaryEnabled
+                      ? 'Around ${_hm(settings.summaryMinute)}, drift per block'
+                      : 'Off',
+                  onTap: _pickSummaryTime,
+                  trailing: Switch(
+                    value: settings.summaryEnabled,
+                    onChanged: settings.setSummaryEnabled,
+                  ),
+                ),
+                SettingsRow(
                   title: 'Learned rules',
                   subtitle: 'Apps you marked for each block',
                   onTap: () => _open(const RulesScreen()),
@@ -317,6 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+            DriveBackupSection(service: context.read<DriveBackupService>()),
             SettingsGroup(
               title: 'Updates',
               children: [
