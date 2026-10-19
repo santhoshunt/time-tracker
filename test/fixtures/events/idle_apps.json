@@ -1,0 +1,13 @@
+{
+  "description": "Launcher, System UI and Drift itself give idle time; only the video app is a session.",
+  "events": [
+    {"t": "2026-10-19T08:00:00", "p": "com.example.launcher", "c": "com.example.launcher.Home", "k": "resumed"},
+    {"t": "2026-10-19T08:01:00", "p": "com.example.launcher", "c": "com.example.launcher.Home", "k": "paused"},
+    {"t": "2026-10-19T08:01:00.300", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+    {"t": "2026-10-19T08:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"},
+    {"t": "2026-10-19T08:10:00.300", "p": "com.android.systemui", "c": "com.android.systemui.Recents", "k": "resumed"},
+    {"t": "2026-10-19T08:11:00", "p": "com.android.systemui", "c": "com.android.systemui.Recents", "k": "paused"},
+    {"t": "2026-10-19T08:11:00.300", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "resumed"},
+    {"t": "2026-10-19T08:15:00", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "paused"}
+  ]
+}

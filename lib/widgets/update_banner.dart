@@ -1,0 +1,91 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/settings_provider.dart';
+import '../services/update_service.dart';
+import 'update_sheet.dart';
+
+/// The Today tab's "Drift X is ready" card: shown when the launch check (or
+/// Settings) found a newer release and the newest one wasn't answered with
+/// Not now. It only opens the version sheet; nothing downloads from here.
+class UpdateBanner extends StatelessWidget {
+  const UpdateBanner({super.key});
+
+  /// Whether the card has something to say, for a caller that lays out
+  /// around it. Call where the widget would build (it reads the settings).
+  static bool showing(BuildContext context, UpdateList? updates) {
+    if (updates == null || updates.newer.isEmpty) return false;
+    final dismissed = context.select<SettingsProvider, String?>(
+      (s) => s.updateDismissedTag,
+    );
+    return updates.newer.first.tag != dismissed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UpdateList?>(
+      valueListenable: availableUpdate,
+      builder: (context, updates, _) {
+        if (!showing(context, updates)) return const SizedBox.shrink();
+        final newest = updates!.newer.first.tag;
+        final scheme = Theme.of(context).colorScheme;
+        final n = updates.newer.length;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.system_update_alt,
+                        size: 20,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Drift ${versionLabel(newest)} is ready',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    n == 1
+                        ? 'A newer version is on GitHub.'
+                        : '$n newer versions on GitHub.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton(
+                        onPressed: () => showUpdateSheet(context, updates),
+                        child: const Text('See versions'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => context
+                            .read<SettingsProvider>()
+                            .dismissUpdate(newest),
+                        child: const Text('Not now'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

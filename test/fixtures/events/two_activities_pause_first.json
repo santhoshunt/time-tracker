@@ -1,0 +1,11 @@
+{
+  "description": "Two activities of one app in the order Android really reports a switch: Main paused, Editor resumed, Main stopped. One session 10:00 to 10:20.",
+  "events": [
+    {"t": "2026-10-19T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+    {"t": "2026-10-19T10:05:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"},
+    {"t": "2026-10-19T10:05:00.200", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "resumed"},
+    {"t": "2026-10-19T10:05:00.900", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "stopped"},
+    {"t": "2026-10-19T10:20:00", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "paused"},
+    {"t": "2026-10-19T10:20:01", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "stopped"}
+  ]
+}

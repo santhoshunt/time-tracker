@@ -1,0 +1,43 @@
+name: drift_time
+description: "Drift: lays your phone's real app use over the day you planned."
+publish_to: 'none'
+
+# Tag vX.Y.Z must equal the version name; the build number (+N) is the
+# Android versionCode and must go up by one every release, because the
+# in-app updater refuses an APK that is not newer than the installed one.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  intl: ^0.20.0
+  package_info_plus: ^10.2.1
+  path: ^1.9.0
+  path_provider: ^2.1.6
+  provider: ^6.1.2
+  shared_preferences: ^2.3.0
+  sqflite: ^2.4.2
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.4
+
+flutter:
+  uses-material-design: true
+
+  # Bundled so the app and the golden tests use the same glyphs on every
+  # device. Only weights 400 and 500 are used anywhere in the UI.
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/roboto-regular.ttf
+          weight: 400
+        - asset: assets/fonts/roboto-medium.ttf
+          weight: 500

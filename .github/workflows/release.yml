@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# The in-app updater installs whatever this workflow publishes, signed with
+# the release key, so the key and the write token are kept away from code
+# the build runs: actions are pinned to commits, the tests run before the
+# key exists, the key is deleted right after the build, and only the
+# publish job (which runs no project code) can write to the repo.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+
+      # The updater compares the tag with the installed version name, and
+      # Android compares versionCodes. A tag that disagrees with pubspec
+      # would publish a release the updater mis-reads.
+      - name: Check the tag matches pubspec
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(sed -n 's/^version: \([0-9.]*\)+.*/\1/p' pubspec.yaml)
+          echo "tag $want, pubspec $have"
+          test "$want" = "$have"
+
+      # The committed android/gradle.properties carries a Windows-only
+      # unix-socket tmpdir for the dev machine. User-home properties take
+      # precedence over project ones, so this neutralizes it on the runner.
+      - name: Override machine-specific Gradle properties
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G
+          kotlin.daemon.jvmargs=-Xmx2G
+          EOF
+
+      - run: sudo apt-get install -y libsqlite3-dev
+      - run: flutter pub get
+      # Golden images are rendered and compared on the Windows dev machine
+      # only; Linux draws text differently. Never ship a red build: the
+      # tests run before the key exists.
+      - run: flutter test --exclude-tags golden,generate
+      - run: flutter build apk --config-only
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testReleaseUnitTest
+
+      - name: Restore release keystore
+        run: printf '%s' "$KEYSTORE_B64" | base64 --decode > android/app/drift.jks
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      # storeFile is resolved by android/app/build.gradle.kts relative to
+      # android/app/, where the keystore was just restored.
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=drift.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=drift
+          EOF
+
+      # One universal APK: the in-app updater downloads this single asset.
+      - run: flutter build apk --release
+
+      - name: Remove the release key
+        if: always()
+        run: rm -f android/app/drift.jks android/key.properties
+
+      # The gradle script silently falls back to debug signing when
+      # key.properties is unusable. Fail loudly instead of publishing a
+      # debug-signed "release": the in-app updater installs only an APK
+      # signed with the installed app's key, and this digest is that key.
+      - name: Verify release signature
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -q 'SHA-256 digest: 9c335b8fcfca09048708f655e5c7d682a9f1e0c7b41da6948dd6089b9bdfe393'
+
+      # The package id is permanent and the versionCode must equal the
+      # pubspec build number, or the updater refuses the APK on the phone.
+      - name: Verify package and versionCode
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          code=$(sed -n 's/^version: [0-9.]*+\([0-9]*\).*/\1/p' pubspec.yaml)
+          "$BT/aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | head -1 | grep -q "package: name='io.github.santhoshunt.drift' versionCode='$code' "
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release and upload assets
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: apk
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          files: app-release.apk
+          generate_release_notes: true

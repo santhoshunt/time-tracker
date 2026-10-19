@@ -1,0 +1,10 @@
+{
+  "description": "The phone crashed: a startup arrives with no shutdown before it. The chat session closes at the last event (13:20) and 13:20 to 13:45 is a shutdown span.",
+  "events": [
+    {"t": "2026-10-19T13:00:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "resumed"},
+    {"t": "2026-10-19T13:20:00", "p": "com.example.chat", "c": "com.example.chat.Thread", "k": "resumed"},
+    {"t": "2026-10-19T13:45:00", "p": "android", "c": null, "k": "startup"},
+    {"t": "2026-10-19T13:46:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "resumed"},
+    {"t": "2026-10-19T14:00:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "paused"}
+  ]
+}

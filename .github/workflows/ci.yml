@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-24.04 # pinned like release.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      # Pinned to the toolchain the repo is developed against (Dart 3.12.x).
+      # Bump together with local Flutter upgrades, here and in release.yml.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.1'
+          channel: stable
+          cache: true
+      - name: Override machine-specific Gradle properties
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G
+          kotlin.daemon.jvmargs=-Xmx2G
+          EOF
+      - run: sudo apt-get install -y libsqlite3-dev
+      - run: flutter pub get
+      - run: flutter analyze
+      # Goldens are checked on the Windows dev machine only (see release.yml).
+      - run: flutter test --exclude-tags golden,generate
+      - run: flutter build apk --config-only
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testReleaseUnitTest

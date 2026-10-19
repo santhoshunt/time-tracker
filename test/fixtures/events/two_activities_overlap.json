@@ -1,0 +1,10 @@
+{
+  "description": "Two activities of one app; the second resumes before the first pauses. One session 10:00 to 10:20.",
+  "events": [
+    {"t": "2026-10-19T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+    {"t": "2026-10-19T10:05:00", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "resumed"},
+    {"t": "2026-10-19T10:05:00.100", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"},
+    {"t": "2026-10-19T10:05:01", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "stopped"},
+    {"t": "2026-10-19T10:20:00", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "paused"}
+  ]
+}

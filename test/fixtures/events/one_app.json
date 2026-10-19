@@ -1,0 +1,8 @@
+{
+  "description": "One app resumed then paused. Times are local.",
+  "events": [
+    {"t": "2026-10-19T09:00:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+    {"t": "2026-10-19T09:30:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"},
+    {"t": "2026-10-19T09:30:01", "p": "com.example.video", "c": "com.example.video.Main", "k": "stopped"}
+  ]
+}

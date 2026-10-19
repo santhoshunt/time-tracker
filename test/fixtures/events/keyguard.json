@@ -1,0 +1,12 @@
+{
+  "description": "The video app has no pause when the screen goes off; screen off and the lock screen give two overlapping idle spans.",
+  "events": [
+    {"t": "2026-10-19T21:00:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+    {"t": "2026-10-19T21:30:00", "p": "android", "c": null, "k": "screenOff"},
+    {"t": "2026-10-19T21:30:01", "p": "android", "c": null, "k": "keyguardShown"},
+    {"t": "2026-10-19T22:00:00", "p": "android", "c": null, "k": "screenOn"},
+    {"t": "2026-10-19T22:00:05", "p": "android", "c": null, "k": "keyguardHidden"},
+    {"t": "2026-10-19T22:00:06", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+    {"t": "2026-10-19T22:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"}
+  ]
+}

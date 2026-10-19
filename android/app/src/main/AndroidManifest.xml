@@ -1,0 +1,157 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- The GitHub update check and the update download. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- App usage events (UsageBridge, UsageBufferWorker). A special access
+         the user grants in Settings, never a runtime dialog. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions"/>
+    <!-- The one-tap battery-optimization exemption, so the hourly buffer
+         job keeps running on aggressive ROMs. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!-- In-app updates: installs a downloaded release of this app. The
+         native side installs only this package, signed with this app's own
+         key and newer than the installed build (UpdateInstaller.kt). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Android 12+: an app updating itself may skip the system confirm. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>
+    <application
+        android:label="Drift"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <!-- No launcher filter here: the launcher entry is whichever
+             activity-alias below is enabled. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+        </activity>
+        <!-- Launcher icons, switched from Settings by enabling one alias and
+             disabling the rest (IconSwitcher.kt). Exactly one is enabled at a
+             time. The names are frozen: never rename or remove one. -->
+        <activity-alias
+            android:name=".IconMeltingClock"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_melting_clock"
+            android:roundIcon="@mipmap/ic_launcher_melting_clock"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".IconTimeRiver"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_time_river"
+            android:roundIcon="@mipmap/ic_launcher_time_river"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".IconSlidingDay"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_sliding_day"
+            android:roundIcon="@mipmap/ic_launcher_sliding_day"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".IconNeedle"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_needle"
+            android:roundIcon="@mipmap/ic_launcher_needle"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".IconWanderer"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_wanderer"
+            android:roundIcon="@mipmap/ic_launcher_wanderer"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".IconEscape"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_escape"
+            android:roundIcon="@mipmap/ic_launcher_escape"
+            android:label="Drift"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- listApps: every app with a launcher entry (Android 11+ package
+             visibility hides them otherwise). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
+        <!-- homePackages: launchers, whose time counts as idle. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.HOME"/>
+        </intent>
+        <!-- url_launcher: open the GitHub release page in a browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
+</manifest>

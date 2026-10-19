@@ -1,0 +1,7 @@
+# golden: pixel comparisons against test/goldens/goldens/*.png. Run locally;
+#   CI and release exclude them.
+# generate: tools that write files (launcher icons), not checks. Run only
+#   through D:\tmp\drift_generate.bat.
+tags:
+  golden:
+  generate:
