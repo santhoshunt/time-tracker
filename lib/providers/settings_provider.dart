@@ -15,6 +15,12 @@ class SettingsProvider extends ChangeNotifier {
   static const _kUpdateLastCheck = 'update_last_check_v1';
   static const _kUpdateDismissed = 'update_dismissed_tag_v1';
   static const _kUpdateInstalling = 'update_installing_tag_v1';
+  static const _kNudgesEnabled = 'nudges_enabled_v1';
+  static const _kNudgeAfter = 'nudge_after_min_v1';
+  static const _kNudgeRepeat = 'nudge_repeat_min_v1';
+  static const _kQuietStart = 'quiet_start_min_v1';
+  static const _kQuietEnd = 'quiet_end_min_v1';
+  static const _kSkippedSetup = 'setup_skipped_v1';
   static const _kLastUpdateVersion = 'update_last_success_version_v1';
   static const _kLastUpdateMs = 'update_last_success_ms_v1';
 
@@ -26,8 +32,31 @@ class SettingsProvider extends ChangeNotifier {
   String? _updateInstallingTag;
   String? _lastUpdateVersion;
   DateTime? _lastUpdateAt;
+  bool _nudgesEnabled = true;
+  int _nudgeAfterMin = 5;
+  int _nudgeRepeatMin = 15;
+  int _quietStartMin = 22 * 60;
+  int _quietEndMin = 7 * 60;
+  Set<String> _skippedSetup = const {};
 
   ThemeId get theme => _theme;
+
+  /// Live nudges on or off. On by default, as Sandy asked for both live
+  /// nudges and the end-of-day review.
+  bool get nudgesEnabled => _nudgesEnabled;
+
+  /// Minutes of continuous off-track use before a nudge.
+  int get nudgeAfterMin => _nudgeAfterMin;
+
+  /// Minimum minutes between two nudges.
+  int get nudgeRepeatMin => _nudgeRepeatMin;
+
+  /// Quiet hours, as minutes from local midnight; equal means none.
+  int get quietStartMin => _quietStartMin;
+  int get quietEndMin => _quietEndMin;
+
+  /// Optional setup pages the user answered with "Not now".
+  Set<String> get skippedSetup => _skippedSetup;
 
   /// The version the last in-app update installed, and when the app first
   /// started on it. Diagnostics shows it, so a pasted report proves the
@@ -71,7 +100,57 @@ class SettingsProvider extends ChangeNotifier {
       final ms = prefs.getInt(_kLastUpdateMs);
       return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
     }, null);
+    _nudgesEnabled = _read(() => prefs.getBool(_kNudgesEnabled) ?? true, true);
+    _nudgeAfterMin = _read(() => prefs.getInt(_kNudgeAfter) ?? 5, 5);
+    _nudgeRepeatMin = _read(() => prefs.getInt(_kNudgeRepeat) ?? 15, 15);
+    _quietStartMin = _read(() => prefs.getInt(_kQuietStart) ?? 22 * 60, 22 * 60);
+    _quietEndMin = _read(() => prefs.getInt(_kQuietEnd) ?? 7 * 60, 7 * 60);
+    _skippedSetup = _read(
+      () => (prefs.getStringList(_kSkippedSetup) ?? const []).toSet(),
+      const <String>{},
+    );
     notifyListeners();
+  }
+
+  Future<void> setNudgesEnabled(bool value) async {
+    if (value == _nudgesEnabled) return;
+    _nudgesEnabled = value;
+    notifyListeners();
+    await _persist(_kNudgesEnabled, (p) => p.setBool(_kNudgesEnabled, value));
+  }
+
+  Future<void> setNudgeAfterMin(int value) async {
+    if (value == _nudgeAfterMin) return;
+    _nudgeAfterMin = value;
+    notifyListeners();
+    await _persist(_kNudgeAfter, (p) => p.setInt(_kNudgeAfter, value));
+  }
+
+  Future<void> setNudgeRepeatMin(int value) async {
+    if (value == _nudgeRepeatMin) return;
+    _nudgeRepeatMin = value;
+    notifyListeners();
+    await _persist(_kNudgeRepeat, (p) => p.setInt(_kNudgeRepeat, value));
+  }
+
+  Future<void> setQuietHours(int startMin, int endMin) async {
+    _quietStartMin = startMin;
+    _quietEndMin = endMin;
+    notifyListeners();
+    await _persist(_kQuietStart, (p) async {
+      await p.setInt(_kQuietStart, startMin);
+      await p.setInt(_kQuietEnd, endMin);
+    });
+  }
+
+  Future<void> skipSetup(String key) async {
+    if (_skippedSetup.contains(key)) return;
+    _skippedSetup = {..._skippedSetup, key};
+    notifyListeners();
+    await _persist(
+      _kSkippedSetup,
+      (p) => p.setStringList(_kSkippedSetup, _skippedSetup.toList()),
+    );
   }
 
   Future<void> recordUpdateSuccess(String version, DateTime when) async {

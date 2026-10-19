@@ -1,0 +1,79 @@
+{
+  "about": "Shared by test/domain/nudge_parity_test.dart and NudgeDeciderTest.kt. T = 1760850000000 is the start of a Deep work window. nowLocalMin is the local minute of the day, passed in so the decision is pure.",
+  "snapshots": {
+    "base": {
+      "v": 1,
+      "writtenAtMs": 1760846400000,
+      "enabled": true,
+      "nudgeAfterMin": 5,
+      "repeatMin": 15,
+      "quietStartMin": 1320,
+      "quietEndMin": 420,
+      "guessOffCategories": ["game", "video", "social", "news"],
+      "windows": [
+        {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": ["com.example.notes", "com.example.chat"], "off": ["com.example.video"]},
+        {"startMs": 1760860800000, "endMs": 1760864400000, "block": "Lunch", "anyApp": true, "on": [], "off": []}
+      ]
+    },
+    "disabled": {
+      "v": 1,
+      "writtenAtMs": 1760846400000,
+      "enabled": false,
+      "nudgeAfterMin": 5,
+      "repeatMin": 15,
+      "quietStartMin": 1320,
+      "quietEndMin": 420,
+      "guessOffCategories": ["game", "video", "social", "news"],
+      "windows": [
+        {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": [], "off": ["com.example.video"]}
+      ]
+    },
+    "stale": {
+      "v": 1,
+      "writtenAtMs": 1760716800000,
+      "enabled": true,
+      "nudgeAfterMin": 5,
+      "repeatMin": 15,
+      "quietStartMin": 1320,
+      "quietEndMin": 420,
+      "guessOffCategories": ["game", "video", "social", "news"],
+      "windows": [
+        {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": [], "off": ["com.example.video"]}
+      ]
+    },
+    "no_quiet": {
+      "v": 1,
+      "writtenAtMs": 1760846400000,
+      "enabled": true,
+      "nudgeAfterMin": 5,
+      "repeatMin": 15,
+      "quietStartMin": 0,
+      "quietEndMin": 0,
+      "guessOffCategories": ["game", "video", "social", "news"],
+      "windows": [
+        {"startMs": 1760850000000, "endMs": 1760860800000, "block": "Deep work", "anyApp": false, "on": [], "off": ["com.example.video"]}
+      ]
+    }
+  },
+  "cases": [
+    {"name": "off-track app past the threshold", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "under the threshold", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 240000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "exactly at the threshold, minutes left rounded up", "snapshot": "base", "nowMs": 1760860710000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 300000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 5, "minutesLeft": 2}},
+    {"name": "nudged 10 minutes ago, repeat is 15", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": 1760851200000, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "nudged 16 minutes ago", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": 1760850840000, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "snoozed for 5 more minutes", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": 1760852100000, "expect": {"nudge": false}},
+    {"name": "snooze already over", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": 1760851700000, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "quiet hours before midnight", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 1380, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "quiet hours after midnight", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 300, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "quiet hours end at 07:00 exactly", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 420, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "equal quiet start and end means no quiet hours", "snapshot": "no_quiet", "nowMs": 1760851800000, "nowLocalMin": 1380, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "nudges switched off", "snapshot": "disabled", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "snapshot older than 36 hours", "snapshot": "stale", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "any app is fine at lunch", "snapshot": "base", "nowMs": 1760863200000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "untagged game guesses off track", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.newgame", "category": "game", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": true, "block": "Deep work", "minutesOff": 6, "minutesLeft": 150}},
+    {"name": "an on-track rule beats a social category", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.chat", "category": "social", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "untagged productivity app guesses on track", "snapshot": "base", "nowMs": 1760851800000, "nowLocalMin": 600, "pkg": "com.example.tool", "category": "productivity", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "outside every window", "snapshot": "base", "nowMs": 1760868000000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}},
+    {"name": "window end is exclusive", "snapshot": "no_quiet", "nowMs": 1760860800000, "nowLocalMin": 600, "pkg": "com.example.video", "category": "video", "continuousMs": 360000, "lastNudgeMs": null, "snoozedUntilMs": null, "expect": {"nudge": false}}
+  ]
+}

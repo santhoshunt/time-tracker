@@ -14,7 +14,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('See which app is open'), findsOneWidget);
-    expect(find.text('Step 1 of 2'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
 
     await tester.tap(find.text('Open settings'));
@@ -22,7 +22,10 @@ void main() {
   });
 
   testWidgets('the tabs show once every permission is granted', (tester) async {
-    final services = await tester.runAsync(() => testServices());
+    final nudges = FakeNudgeBridge()
+      ..notifications = true
+      ..overlay = true;
+    final services = await tester.runAsync(() => testServices(nudges: nudges));
     final settings = await testSettings();
     await tester.pumpWidget(DriftApp(services: services!, settings: settings));
     await tester.pumpAndSettle();

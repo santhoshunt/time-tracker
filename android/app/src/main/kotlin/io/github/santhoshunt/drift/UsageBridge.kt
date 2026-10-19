@@ -95,6 +95,28 @@ class UsageBridge(private val activity: Activity) {
         }
 
         fun bufferDir(context: Context): File = File(context.filesDir, BUFFER_DIR)
+
+        @Suppress("DEPRECATION")
+        fun resolve(context: Context, intent: Intent): List<ResolveInfo> {
+            val pm = context.packageManager
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                pm.queryIntentActivities(intent, 0)
+            }
+        }
+
+        /** Launchers: time spent in them counts as idle, and NudgeService
+         * never nudges about them. The Settings app's FallbackHome also
+         * answers HOME, at a negative priority, so it is left out;
+         * otherwise all Settings time would read as idle. */
+        fun homePackages(context: Context): List<String> {
+            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            return resolve(context, home)
+                .filter { it.priority >= 0 }
+                .mapNotNull { it.activityInfo?.packageName }
+                .distinct()
+        }
     }
 
     /** Event, app and icon queries can take hundreds of milliseconds and
@@ -130,7 +152,7 @@ class UsageBridge(private val activity: Activity) {
                 val p = call.argument<String>("p")
                 background(result) { p?.let(::appIcon) }
             }
-            "homePackages" -> background(result) { homePackages() }
+            "homePackages" -> background(result) { homePackages(activity) }
             "drainBuffer" -> background(result) { drainBuffer() }
             "deleteBuffer" -> {
                 val paths = call.argument<List<String>>("paths") ?: emptyList()
@@ -207,16 +229,6 @@ class UsageBridge(private val activity: Activity) {
         return e.timeStamp
     }
 
-    @Suppress("DEPRECATION")
-    private fun resolve(intent: Intent): List<ResolveInfo> {
-        val pm = activity.packageManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
-        } else {
-            pm.queryIntentActivities(intent, 0)
-        }
-    }
-
     /** One entry per package with a launcher activity. Needs the
      * MAIN/LAUNCHER <queries> entry on Android 11 and later. */
     private fun listApps(): List<Map<String, Any?>> {
@@ -224,7 +236,7 @@ class UsageBridge(private val activity: Activity) {
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val seen = HashSet<String>()
         val out = ArrayList<Map<String, Any?>>()
-        for (info in resolve(launcher)) {
+        for (info in resolve(activity, launcher)) {
             val app = info.activityInfo?.applicationInfo ?: continue
             if (!seen.add(app.packageName)) continue
             out.add(
@@ -250,17 +262,6 @@ class UsageBridge(private val activity: Activity) {
         val bytes = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes)
         return bytes.toByteArray()
-    }
-
-    /** Launchers: time spent in them counts as idle. The Settings app's
-     * FallbackHome also answers HOME, at a negative priority, so it is left
-     * out; otherwise all Settings time would read as idle. */
-    private fun homePackages(): List<String> {
-        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        return resolve(home)
-            .filter { it.priority >= 0 }
-            .mapNotNull { it.activityInfo?.packageName }
-            .distinct()
     }
 
     /** Finished buffer files, oldest first. A file the worker is still

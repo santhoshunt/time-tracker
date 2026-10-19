@@ -13,7 +13,16 @@ import '../widgets/undo_snackbar.dart';
 import '../widgets/update_sheet.dart';
 import 'diagnostics_screen.dart';
 import 'icon_picker_screen.dart';
+import 'rules_screen.dart';
 import 'theme_picker_screen.dart';
+
+/// "22:00 to 07:00", or "Off" when start and end are the same.
+String quietHoursLabel(int start, int end) {
+  if (start == end) return 'Off';
+  String hm(int m) =>
+      '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+  return '${hm(start)} to ${hm(end)}';
+}
 
 /// Settings option A: grouped rows. Appearance (Theme, App icon), Updates
 /// (Check for updates, Check on launch) and Help (Diagnostics). Each
@@ -54,6 +63,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _open(Widget page) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
     if (mounted) _loadIcon();
+  }
+
+  Future<void> _pickMinutes({
+    required String title,
+    required List<int> options,
+    required int current,
+    required String Function(int) label,
+    required Future<void> Function(int) onPicked,
+  }) async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: RadioGroup<int>(
+          groupValue: current,
+          onChanged: (v) => Navigator.pop(context, v),
+          // Scrolls on short screens and with large text instead of
+          // overflowing.
+          child: SingleChildScrollView(
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+              ),
+              for (final o in options)
+                RadioListTile<int>(value: o, title: Text(label(o))),
+              const SizedBox(height: 8),
+            ],
+          ),
+          ),
+        ),
+      ),
+    );
+    if (picked != null) await onPicked(picked);
+  }
+
+  Future<void> _pickQuietHours() async {
+    final settings = context.read<SettingsProvider>();
+    TimeOfDay at(int m) => TimeOfDay(hour: m ~/ 60, minute: m % 60);
+    Future<TimeOfDay?> pick(String help, int m) => showTimePicker(
+      context: context,
+      helpText: help,
+      initialTime: at(m),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    final start = await pick('Quiet from', settings.quietStartMin);
+    if (start == null || !mounted) return;
+    final end = await pick('Quiet until', settings.quietEndMin);
+    if (end == null) return;
+    await settings.setQuietHours(
+      start.hour * 60 + start.minute,
+      end.hour * 60 + end.minute,
+    );
   }
 
   Future<void> _checkForUpdates() async {
@@ -100,6 +169,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
+            SettingsGroup(
+              title: 'Nudges',
+              children: [
+                SettingsRow(
+                  title: 'Live nudges',
+                  subtitle: 'When you drift from your plan',
+                  onTap: () =>
+                      settings.setNudgesEnabled(!settings.nudgesEnabled),
+                  trailing: Switch(
+                    value: settings.nudgesEnabled,
+                    onChanged: settings.setNudgesEnabled,
+                  ),
+                ),
+                if (settings.nudgesEnabled) ...[
+                  SettingsRow(
+                    title: 'Nudge after',
+                    value: '${settings.nudgeAfterMin} min',
+                    onTap: () => _pickMinutes(
+                      title: 'Nudge after this much drift',
+                      options: const [2, 5, 10, 15, 30],
+                      current: settings.nudgeAfterMin,
+                      label: (m) => '$m min',
+                      onPicked: settings.setNudgeAfterMin,
+                    ),
+                  ),
+                  SettingsRow(
+                    title: 'Repeat at most',
+                    value: 'every ${settings.nudgeRepeatMin} min',
+                    onTap: () => _pickMinutes(
+                      title: 'Nudge again at most every',
+                      options: const [5, 10, 15, 30, 60],
+                      current: settings.nudgeRepeatMin,
+                      label: (m) => '$m min',
+                      onPicked: settings.setNudgeRepeatMin,
+                    ),
+                  ),
+                  SettingsRow(
+                    title: 'Quiet hours',
+                    value: quietHoursLabel(
+                      settings.quietStartMin,
+                      settings.quietEndMin,
+                    ),
+                    onTap: _pickQuietHours,
+                  ),
+                ],
+                SettingsRow(
+                  title: 'Learned rules',
+                  subtitle: 'Apps you marked for each block',
+                  onTap: () => _open(const RulesScreen()),
+                ),
+              ],
+            ),
             SettingsGroup(
               title: 'Appearance',
               children: [

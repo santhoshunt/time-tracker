@@ -18,10 +18,14 @@ class MainActivity : FlutterFragmentActivity() {
 
         /** Dart to native: verify and install a downloaded update. */
         private const val UPDATE_CHANNEL = "drift/update"
+
+        /** Dart to native: nudge permissions and the nudge service. */
+        private const val NUDGE_CHANNEL = "drift/nudge"
     }
 
     private var usageBridge: UsageBridge? = null
     private var updateInstaller: UpdateInstaller? = null
+    private var nudgeBridge: NudgeBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -41,7 +45,23 @@ class MainActivity : FlutterFragmentActivity() {
             updateChannel.setMethodCallHandler(installer::handle)
         }
 
+        nudgeBridge?.dispose()
+        nudgeBridge = NudgeBridge(this).also { bridge ->
+            MethodChannel(messenger, NUDGE_CHANNEL).setMethodCallHandler(bridge::handle)
+        }
+
         scheduleBuffer()
+    }
+
+    /** super first, so Flutter plugins still get their own results. */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        nudgeBridge?.onRequestPermissionsResult(requestCode, grantResults)
     }
 
     override fun onDestroy() {
@@ -49,6 +69,8 @@ class MainActivity : FlutterFragmentActivity() {
         usageBridge = null
         updateInstaller?.dispose()
         updateInstaller = null
+        nudgeBridge?.dispose()
+        nudgeBridge = null
         super.onDestroy()
     }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform/nudge_bridge.dart';
 import '../platform/usage_source.dart';
 import '../theme/drift_theme.dart';
 
@@ -7,13 +8,21 @@ import '../theme/drift_theme.dart';
 /// send the user to the Android screen that grants it.
 class SetupStep {
   const SetupStep({
+    required this.key,
     required this.icon,
     required this.title,
     required this.body,
     required this.action,
     required this.isDone,
     required this.open,
+    this.optional = false,
   });
+
+  /// Stable name, stored when an optional step is skipped.
+  final String key;
+
+  /// Optional steps offer "Not now"; Drift works without them, with less.
+  final bool optional;
 
   final IconData icon;
   final String title;
@@ -26,8 +35,9 @@ class SetupStep {
 /// The steps for this release, in order. Pages come only from steps that
 /// are not done yet, so a permission added in a later release shows up
 /// on its own after the update.
-List<SetupStep> setupSteps(UsageSource usage) => [
+List<SetupStep> setupSteps(UsageSource usage, [NudgeBridge? nudges]) => [
   SetupStep(
+    key: 'usage_access',
     icon: Icons.visibility_outlined,
     title: 'See which app is open',
     body:
@@ -38,6 +48,7 @@ List<SetupStep> setupSteps(UsageSource usage) => [
     open: usage.openUsageAccessSettings,
   ),
   SetupStep(
+    key: 'battery',
     icon: Icons.battery_charging_full_outlined,
     title: 'Keep Drift running',
     body:
@@ -47,12 +58,46 @@ List<SetupStep> setupSteps(UsageSource usage) => [
     isDone: usage.isIgnoringBatteryOptimizations,
     open: usage.requestIgnoreBatteryOptimizations,
   ),
+  if (nudges != null) ...[
+    SetupStep(
+      key: 'notifications',
+      optional: true,
+      icon: Icons.notifications_none_outlined,
+      title: 'Let Drift tap you on the shoulder',
+      body:
+          'When you drift from your plan for a few minutes, Drift tells you. '
+          'Allow notifications so it can.',
+      action: 'Allow notifications',
+      isDone: nudges.hasNotificationPermission,
+      open: () async {
+        await nudges.requestNotificationPermission();
+      },
+    ),
+    SetupStep(
+      key: 'overlay',
+      optional: true,
+      icon: Icons.layers_outlined,
+      title: 'Nudge right on top of the app',
+      body:
+          'Android opens Settings. Find Drift and allow Display over other '
+          'apps, so a nudge shows over the app you drifted into. Without it '
+          'Drift sends a notification instead.',
+      action: 'Open settings',
+      isDone: nudges.canDrawOverlays,
+      open: nudges.openOverlaySettings,
+    ),
+  ],
 ];
 
-/// Returns the steps still missing, in order.
-Future<List<SetupStep>> missingSteps(List<SetupStep> steps) async {
+/// Returns the steps still missing, in order. Optional steps in [skipped]
+/// count as done.
+Future<List<SetupStep>> missingSteps(
+  List<SetupStep> steps, {
+  Set<String> skipped = const {},
+}) async {
   final missing = <SetupStep>[];
   for (final s in steps) {
+    if (s.optional && skipped.contains(s.key)) continue;
     if (!await s.isDone()) missing.add(s);
   }
   return missing;
@@ -66,10 +111,18 @@ class OnboardingScreen extends StatefulWidget {
     super.key,
     required this.steps,
     required this.onDone,
+    this.skipped = const {},
+    this.onSkip,
   });
 
   final List<SetupStep> steps;
   final VoidCallback onDone;
+
+  /// Optional step keys already answered with "Not now".
+  final Set<String> skipped;
+
+  /// Stores a "Not now" so the step is not offered again.
+  final Future<void> Function(String key)? onSkip;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -78,6 +131,13 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen>
     with WidgetsBindingObserver {
   List<SetupStep>? _missing;
+  late final Set<String> _skipped = {...widget.skipped};
+
+  Future<void> _skip(SetupStep step) async {
+    _skipped.add(step.key);
+    await widget.onSkip?.call(step.key);
+    await _refresh();
+  }
 
   @override
   void initState() {
@@ -98,7 +158,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _refresh() async {
-    final missing = await missingSteps(widget.steps);
+    final missing = await missingSteps(widget.steps, skipped: _skipped);
     if (!mounted) return;
     if (missing.isEmpty) {
       widget.onDone();
@@ -161,6 +221,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   child: Text(step.action),
                 ),
               ),
+              if (step.optional)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextButton(
+                    onPressed: () => _skip(step),
+                    child: const Text('Not now'),
+                  ),
+                ),
             ],
           ),
         ),

@@ -188,7 +188,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(settings.updateOnLaunch, isTrue);
-      await tester.tap(find.byType(Switch));
+      final row = find.ancestor(
+        of: find.text('Check on launch'),
+        matching: find.byType(InkWell),
+      );
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: row, matching: find.byType(Switch)));
       await tester.pumpAndSettle();
       expect(settings.updateOnLaunch, isFalse);
     });

@@ -10,8 +10,11 @@ import 'screens/plan_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/today_screen.dart';
+import 'services/day_loader.dart';
+import 'services/nudge_sync.dart';
 import 'services/update_installer.dart';
 import 'services/update_launch_check.dart';
+import 'widgets/ask_sheet.dart';
 import 'theme/drift_theme.dart';
 import 'widgets/undo_snackbar.dart';
 
@@ -59,8 +62,10 @@ class _SetupGateState extends State<_SetupGate> {
   @override
   void initState() {
     super.initState();
-    _steps = setupSteps(context.read<AppServices>().usage);
-    missingSteps(_steps).then((missing) {
+    final services = context.read<AppServices>();
+    final settings = context.read<SettingsProvider>();
+    _steps = setupSteps(services.usage, services.nudges);
+    missingSteps(_steps, skipped: settings.skippedSetup).then((missing) {
       if (mounted) setState(() => _needsSetup = missing.isNotEmpty);
     });
   }
@@ -72,8 +77,11 @@ class _SetupGateState extends State<_SetupGate> {
       return Scaffold(backgroundColor: context.drift.bg);
     }
     if (needsSetup) {
+      final settings = context.read<SettingsProvider>();
       return OnboardingScreen(
         steps: _steps,
+        skipped: settings.skippedSetup,
+        onSkip: settings.skipSetup,
         onDone: () => setState(() => _needsSetup = false),
       );
     }
@@ -93,34 +101,74 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
 
+  /// Guessed apps still waiting for an answer today: the Today badge.
+  int _asks = 0;
+  bool _asking = false;
+  late final AppServices _services;
+  late final SettingsProvider _settings;
+
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void initState() {
     super.initState();
+    _services = context.read<AppServices>();
+    _settings = context.read<SettingsProvider>();
     WidgetsBinding.instance.addObserver(this);
+    _services.revision.addListener(_onDataChanged);
+    _settings.addListener(_syncNudges);
     WidgetsBinding.instance.addPostFrameCallback((_) => _onStart());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _services.revision.removeListener(_onDataChanged);
+    _settings.removeListener(_syncNudges);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    context.read<AppServices>().ingest();
-    runLaunchUpdateCheck(context.read<SettingsProvider>(), isAndroid: _isAndroid);
+    _readAndAsk();
+    runLaunchUpdateCheck(_settings, isAndroid: _isAndroid);
+  }
+
+  /// The plan, the rules or the usage changed: refresh the badge and the
+  /// snapshot the nudge service reads.
+  Future<void> _onDataChanged() async {
+    _syncNudges();
+    final day = await loadDay(_services, _services.clock.now());
+    if (mounted) setState(() => _asks = day.unanswered.length);
+  }
+
+  void _syncNudges() {
+    if (!mounted) return;
+    syncNudges(_services, _settings, context.drift);
+  }
+
+  /// Reads new usage, then asks about guessed apps, one sheet at a time.
+  Future<void> _readAndAsk() async {
+    await _services.ingest();
+    if (!mounted || _asking) return;
+    final day = await loadDay(_services, _services.clock.now());
+    if (!mounted || day.unanswered.isEmpty) return;
+    _asking = true;
+    try {
+      await showAskQueue(context, _services, day);
+    } finally {
+      _asking = false;
+    }
   }
 
   Future<void> _onStart() async {
-    final services = context.read<AppServices>();
-    final settings = context.read<SettingsProvider>();
+    final services = _services;
+    final settings = _settings;
     final messenger = ScaffoldMessenger.of(context);
-    services.ingest();
+    _syncNudges();
+    _readAndAsk();
     final message = await takeUpdateResultMessage(settings);
     if (message != null) {
       final info = await PackageInfo.fromPlatform();
@@ -153,23 +201,31 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule),
+            icon: Badge(
+              isLabelVisible: _asks > 0,
+              label: Text('$_asks'),
+              child: const Icon(Icons.schedule_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: _asks > 0,
+              label: Text('$_asks'),
+              child: const Icon(Icons.schedule),
+            ),
             label: 'Today',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Plan',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Review',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',

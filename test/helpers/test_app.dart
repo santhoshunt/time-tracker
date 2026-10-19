@@ -2,6 +2,7 @@ import 'package:drift_time/app_services.dart';
 import 'package:drift_time/data/drift_db.dart';
 import 'package:drift_time/domain/clock.dart';
 import 'package:drift_time/platform/icon_switcher.dart';
+import 'package:drift_time/platform/nudge_bridge.dart';
 import 'package:drift_time/providers/settings_provider.dart';
 import 'package:drift_time/theme/drift_theme.dart';
 import 'package:drift_time/theme/theme_id.dart';
@@ -31,11 +32,52 @@ class FakeIconSwitcher implements IconSwitcher {
   }
 }
 
+/// Records service starts and stops; permissions are plain fields.
+class FakeNudgeBridge implements NudgeBridge {
+  bool overlay = false;
+  bool notifications = false;
+  bool running = false;
+  int starts = 0;
+  int stops = 0;
+  int notificationRequests = 0;
+
+  @override
+  Future<bool> canDrawOverlays() async => overlay;
+
+  @override
+  Future<void> openOverlaySettings() async {}
+
+  @override
+  Future<bool> hasNotificationPermission() async => notifications;
+
+  @override
+  Future<bool> requestNotificationPermission() async {
+    notificationRequests++;
+    return notifications;
+  }
+
+  @override
+  Future<void> startService() async {
+    starts++;
+    running = true;
+  }
+
+  @override
+  Future<void> stopService() async {
+    stops++;
+    running = false;
+  }
+
+  @override
+  Future<Map<String, Object?>> serviceStatus() async => {'running': running};
+}
+
 /// AppServices over an in-memory database and fakes. Each call gets a
 /// fresh database.
 Future<AppServices> testServices({
   FakeUsageSource? usage,
   FakeIconSwitcher? icons,
+  FakeNudgeBridge? nudges,
   DateTime? now,
 }) async {
   sqfliteFfiInit();
@@ -48,6 +90,7 @@ Future<AppServices> testServices({
     usage: usage ?? FakeUsageSource(),
     icons: icons ?? FakeIconSwitcher(),
     clock: FixedClock(now ?? testNow),
+    nudges: nudges ?? FakeNudgeBridge(),
   );
 }
 

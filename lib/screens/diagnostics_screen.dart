@@ -31,6 +31,13 @@ Future<List<DiagnosticLine>> collectDiagnostics(
   final workerMs = native['workerLastRunMs'] as int?;
   final bufferFiles = native['bufferFiles'] as int? ?? 0;
   final cursorMs = await s.meta.getInt(Ingestor.cursorKey);
+  final notifications = await s.nudges.hasNotificationPermission();
+  final overlay = await s.nudges.canDrawOverlays();
+  final service = await s.nudges.serviceStatus();
+  final running = service['running'] == true;
+  final tickMs = service['lastTickMs'] as int?;
+  final nudgeMs = service['lastNudgeMs'] as int?;
+  final serviceError = service['lastError'] as String?;
   final events24h = await s.events.between(
     now.subtract(const Duration(hours: 24)).millisecondsSinceEpoch,
     now.millisecondsSinceEpoch,
@@ -68,6 +75,31 @@ Future<List<DiagnosticLine>> collectDiagnostics(
       ok: workerAge != null && workerAge < const Duration(hours: 3),
     ),
     (key: 'buffer_files', label: 'Files waiting', value: '$bufferFiles', ok: null),
+    (
+      key: 'notifications',
+      label: 'Notifications',
+      value: notifications ? 'Allowed' : 'Off',
+      ok: settings.nudgesEnabled ? notifications : null,
+    ),
+    (
+      key: 'overlay',
+      label: 'Display over apps',
+      value: overlay ? 'Allowed' : 'Off',
+      ok: settings.nudgesEnabled ? overlay : null,
+    ),
+    (
+      key: 'nudge_service',
+      label: 'Nudge service',
+      value: !settings.nudgesEnabled
+          ? 'Switched off'
+          : running
+          ? 'Running, checked ${ago(tickMs)}'
+          : 'Not running',
+      ok: settings.nudgesEnabled ? running : null,
+    ),
+    (key: 'last_nudge', label: 'Last nudge', value: ago(nudgeMs), ok: null),
+    if (serviceError != null)
+      (key: 'service_error', label: 'Service error', value: serviceError, ok: false),
     (key: 'last_ingest', label: 'Last read', value: ago(cursorMs), ok: null),
     (key: 'events_24h', label: 'Events, last 24 h', value: '${events24h.length}', ok: null),
     (key: 'sessions_today', label: 'Sessions today', value: '${sessionsToday.length}', ok: null),

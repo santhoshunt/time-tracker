@@ -10,8 +10,10 @@ import 'data/repositories/rule_repository.dart';
 import 'data/repositories/session_repository.dart';
 import 'domain/clock.dart';
 import 'domain/ingestor.dart';
+import 'platform/channel_nudge_bridge.dart';
 import 'platform/channel_usage_source.dart';
 import 'platform/icon_switcher.dart';
+import 'platform/nudge_bridge.dart';
 import 'platform/usage_source.dart';
 
 /// Drift's own package. Its foreground time is idle, never drift.
@@ -26,6 +28,7 @@ class AppServices {
     required this.usage,
     required this.icons,
     required this.clock,
+    this.nudges = const DisabledNudgeBridge(),
   }) : events = EventRepository(db),
        sessions = SessionRepository(db),
        plans = PlanRepository(db),
@@ -50,11 +53,13 @@ class AppServices {
     usage: const ChannelUsageSource(),
     icons: const ChannelIconSwitcher(),
     clock: SystemClock(),
+    nudges: const ChannelNudgeBridge(),
   );
 
   final Database db;
   final UsageSource usage;
   final IconSwitcher icons;
+  final NudgeBridge nudges;
   final Clock clock;
   final EventRepository events;
   final SessionRepository sessions;

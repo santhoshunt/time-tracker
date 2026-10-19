@@ -18,3 +18,10 @@
 -keepnames class io.github.santhoshunt.drift.UsageBridge
 -keepnames class io.github.santhoshunt.drift.IconSwitcher
 -keepnames class io.github.santhoshunt.drift.UpdateInstaller
+-keepnames class io.github.santhoshunt.drift.NudgeBridge
+
+# NudgeDecider and NudgeOverlay are objects called from one place, so R8
+# inlines them and drops the classes. Keep the classes (not their members)
+# so crash traces name them and the release dex check finds them.
+-keep class io.github.santhoshunt.drift.NudgeDecider
+-keep class io.github.santhoshunt.drift.NudgeOverlay

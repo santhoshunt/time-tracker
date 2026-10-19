@@ -16,6 +16,14 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- Android 12+: an app updating itself may skip the system confirm. -->
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>
+    <!-- Live nudges (NudgeService.kt): a foreground service of type
+         specialUse, its notifications, the full-screen overlay, and a
+         restart after reboot. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="Drift"
         android:name="${applicationName}"
@@ -121,6 +129,31 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+        <!-- Live nudges. Started only by this app (NudgeBridge, BootReceiver),
+             so not exported. -->
+        <service
+            android:name=".NudgeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Plan adherence nudges"/>
+        </service>
+        <!-- Both broadcasts come from the system, which reaches a
+             non-exported receiver (WorkManager's RescheduleReceiver relies on
+             the same), so no other app can trigger this. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+        <!-- The nudge notification's "5 more minutes"; explicit intents only. -->
+        <receiver
+            android:name=".NudgeActionReceiver"
+            android:exported="false"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
