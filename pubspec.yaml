@@ -5,7 +5,7 @@ publish_to: 'none'
 # Tag vX.Y.Z must equal the version name; the build number (+N) is the
 # Android versionCode and must go up by one every release, because the
 # in-app updater refuses an APK that is not newer than the installed one.
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ^3.12.1

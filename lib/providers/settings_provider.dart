@@ -15,6 +15,8 @@ class SettingsProvider extends ChangeNotifier {
   static const _kUpdateLastCheck = 'update_last_check_v1';
   static const _kUpdateDismissed = 'update_dismissed_tag_v1';
   static const _kUpdateInstalling = 'update_installing_tag_v1';
+  static const _kLastUpdateVersion = 'update_last_success_version_v1';
+  static const _kLastUpdateMs = 'update_last_success_ms_v1';
 
   ThemeId _theme = ThemeId.mono;
   TodayView _todayView = TodayView.lanes;
@@ -22,8 +24,16 @@ class SettingsProvider extends ChangeNotifier {
   DateTime? _updateLastCheck;
   String? _updateDismissedTag;
   String? _updateInstallingTag;
+  String? _lastUpdateVersion;
+  DateTime? _lastUpdateAt;
 
   ThemeId get theme => _theme;
+
+  /// The version the last in-app update installed, and when the app first
+  /// started on it. Diagnostics shows it, so a pasted report proves the
+  /// updater worked on the phone.
+  String? get lastUpdateVersion => _lastUpdateVersion;
+  DateTime? get lastUpdateAt => _lastUpdateAt;
   TodayView get todayView => _todayView;
 
   /// Whether to look for a newer GitHub release once a day on launch.
@@ -56,7 +66,22 @@ class SettingsProvider extends ChangeNotifier {
       () => prefs.getString(_kUpdateInstalling),
       null,
     );
+    _lastUpdateVersion = _read(() => prefs.getString(_kLastUpdateVersion), null);
+    _lastUpdateAt = _read(() {
+      final ms = prefs.getInt(_kLastUpdateMs);
+      return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+    }, null);
     notifyListeners();
+  }
+
+  Future<void> recordUpdateSuccess(String version, DateTime when) async {
+    _lastUpdateVersion = version;
+    _lastUpdateAt = when;
+    notifyListeners();
+    await _persist(_kLastUpdateVersion, (p) async {
+      await p.setString(_kLastUpdateVersion, version);
+      await p.setInt(_kLastUpdateMs, when.millisecondsSinceEpoch);
+    });
   }
 
   Future<void> setTheme(ThemeId value) async {

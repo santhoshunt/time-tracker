@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'app_services.dart';
@@ -122,6 +123,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     services.ingest();
     final message = await takeUpdateResultMessage(settings);
     if (message != null) {
+      final info = await PackageInfo.fromPlatform();
+      await settings.recordUpdateSuccess(info.version, services.clock.now());
       showAppToastOn(
         messenger,
         message,

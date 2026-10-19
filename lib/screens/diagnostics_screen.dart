@@ -74,6 +74,14 @@ Future<List<DiagnosticLine>> collectDiagnostics(
     (key: 'gaps_7d', label: 'No-data gaps, 7 days', value: '${gaps.length}', ok: gaps.isEmpty),
     (key: 'theme', label: 'Theme', value: settings.theme.label, ok: null),
     (
+      key: 'last_in_app_update',
+      label: 'Last in-app update',
+      value: settings.lastUpdateVersion == null
+          ? 'none yet'
+          : 'v${settings.lastUpdateVersion}, ${ago(settings.lastUpdateAt?.millisecondsSinceEpoch)}',
+      ok: null,
+    ),
+    (
       key: 'version',
       label: 'Version',
       value: '${info.version} (${info.buildNumber})',

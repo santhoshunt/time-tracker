@@ -225,6 +225,17 @@ void main() {
       expect(copied.single, contains('battery_exempt: Restricted'));
       expect(copied.single, contains('version: 0.1.0 (1)'));
       expect(find.text('Report copied'), findsOneWidget);
+      expect(copied.single, contains('last_in_app_update: none yet'));
+    });
+
+    test('a recorded in-app update shows in the report and survives a restart', () async {
+      await settings.recordUpdateSuccess('0.1.1', testNow.subtract(const Duration(minutes: 5)));
+      final reloaded = SettingsProvider();
+      await reloaded.load();
+      expect(reloaded.lastUpdateVersion, '0.1.1');
+
+      final lines = await collectDiagnostics(services, reloaded, packageInfo: _info);
+      expect(diagnosticsReport(lines), contains('last_in_app_update: v0.1.1, 5 min ago'));
     });
   });
 
