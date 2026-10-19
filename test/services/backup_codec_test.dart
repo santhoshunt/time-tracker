@@ -26,6 +26,8 @@ const _settings = <String, Object>{
   'week_start_v1': 'sunday',
   'summary_enabled_v1': false,
   'summary_minute_v1': 1200,
+  'focus_lock_v1': true,
+  'weekly_target_v1': 70,
 };
 
 /// Fills every backed-up table with at least one row.
@@ -166,6 +168,8 @@ void main() {
       expect(settings.nudgeAfterMin, 10);
       expect(settings.firstWeekday, DateTime.sunday);
       expect(settings.skippedSetup, {'overlay', 'notifications'});
+      expect(settings.focusLock, isTrue);
+      expect(settings.weeklyTarget, 70);
       expect(bumps, greaterThan(0));
     });
 
@@ -196,6 +200,9 @@ void main() {
       // A setting the backup lacks goes back to its default.
       expect(prefs.containsKey('nudge_after_min_v1'), isFalse);
       expect(settings.nudgeAfterMin, 5);
+      // A backup from before v0.5.0 has neither new key: defaults apply.
+      expect(settings.focusLock, isFalse);
+      expect(settings.weeklyTarget, 80);
     });
   });
 

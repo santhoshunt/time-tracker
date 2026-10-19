@@ -65,17 +65,21 @@ class _TodayScreenState extends State<TodayScreen> {
   /// The day first, so the score card never waits for the streak, which
   /// can read months of history.
   Future<void> _reload() async {
+    final generation = ++_generation;
     final now = _services.clock.now();
     final data = await loadDay(_services, now);
-    if (!mounted) return;
+    if (!mounted || generation != _generation) return;
     setState(() => _data = data);
     final week = await loadWeekProgress(
       _services,
       now,
       firstWeekday: _settings.firstWeekday,
     );
-    if (mounted) setState(() => _week = week);
+    if (mounted && generation == _generation) setState(() => _week = week);
   }
+
+  /// Counts reloads, so one that finishes after a newer one is dropped.
+  int _generation = 0;
 
   void _showSegment(Segment s) {
     final data = _data;

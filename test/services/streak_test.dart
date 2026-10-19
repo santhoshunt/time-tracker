@@ -88,6 +88,14 @@ void main() {
       expect(w.week.first.day, DateTime(2026, 10, 18));
     });
 
+    test('days with blocks but no data neither add to nor break a run', () async {
+      await seed(goodDays: 3, poorDaysBack: 40);
+      // Days 3 to 39 back have blocks but no data; the poor day 40 back,
+      // in the second chunk, ends the run at three.
+      final w = await loadWeekProgress(s, testNow, firstWeekday: DateTime.monday);
+      expect(w.streak, 3);
+    });
+
     test('nothing planned means no plan and no streak', () async {
       final w = await loadWeekProgress(s, testNow, firstWeekday: DateTime.monday);
       expect(w.hasPlan, isFalse);

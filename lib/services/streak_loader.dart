@@ -24,6 +24,20 @@ class WeekProgress {
   bool get hasPlan => week.any((d) => d.hasPlan);
 }
 
+/// Local midnight of the earliest stored session or idle span, or null
+/// when nothing has been tracked yet.
+Future<DateTime?> _firstTrackedDay(AppServices s) async {
+  final rows = await s.db.rawQuery(
+    'SELECT MIN(m) AS m FROM ('
+    'SELECT MIN(start_ms) AS m FROM sessions '
+    'UNION ALL SELECT MIN(start_ms) AS m FROM idle_spans)',
+  );
+  final ms = rows.first['m'] as int?;
+  if (ms == null) return null;
+  final t = DateTime.fromMillisecondsSinceEpoch(ms);
+  return DateTime(t.year, t.month, t.day);
+}
+
 /// How many days one streak query loads, and the most it looks back.
 const _chunkDays = 28;
 const _maxChunks = 13;
@@ -42,16 +56,20 @@ Future<WeekProgress> loadWeekProgress(
   final range = weekOf(day, firstWeekday: firstWeekday);
   final week = summarize(await loadDays(s, range.start, range.end));
 
+  // Days before the first stored session or idle span have no score and
+  // never break a run, so without this floor a good streak (or a new
+  // install) would read all thirteen chunks on every reload.
+  final first = await _firstTrackedDay(s);
   final points = <DayPoint>[];
   var end = day;
-  for (var i = 0; i < _maxChunks; i++) {
+  for (var i = 0; first != null && i < _maxChunks; i++) {
     final start = DateTime(end.year, end.month, end.day - (_chunkDays - 1));
     final chunk = summarize(await loadDays(s, start, end)).days;
     points.insertAll(0, chunk);
     final broke = chunk.any(
       (p) => p.day != day && p.percent != null && p.percent! < goodPercent,
     );
-    if (broke) break;
+    if (broke || !start.isAfter(first)) break;
     end = DateTime(start.year, start.month, start.day - 1);
   }
   return WeekProgress(
