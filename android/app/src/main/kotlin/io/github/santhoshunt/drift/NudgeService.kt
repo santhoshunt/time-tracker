@@ -124,6 +124,13 @@ class NudgeService : Service() {
     private var snapshotStamp: Pair<Long, Long>? = null
     private var snapshot: NudgeSnapshot? = null
 
+    /** The last usage notification posted, so a restart (Dart starts the
+     * service again on every sync) keeps showing the numbers instead of
+     * "Drift is watching your plan" until the next count. Written on the
+     * tick thread, read on the main thread. */
+    @Volatile
+    private var lastUsage: android.app.Notification? = null
+
     // The Today notifications, also tick-thread only.
     private var lastCountMs = 0L
     private var shownUsage = false
@@ -176,7 +183,7 @@ class NudgeService : Service() {
             } else {
                 0
             }
-            ServiceCompat.startForeground(this, SERVICE_NOTIFICATION_ID, serviceNotification(), type)
+            ServiceCompat.startForeground(this, SERVICE_NOTIFICATION_ID, lastUsage ?: serviceNotification(), type)
         } catch (e: Exception) {
             recordError(this, e)
             stopSelf()
@@ -221,6 +228,7 @@ class NudgeService : Service() {
                 nm.notify(SERVICE_NOTIFICATION_ID, serviceNotification())
                 shownUsage = false
             }
+            lastUsage = null
         } else {
             TodayNotifications.createChannels(this)
             val line = TodayNotifications.blockLine(snap, now)
@@ -230,10 +238,9 @@ class NudgeService : Service() {
             }
             if (!shownUsage || now - lastCountMs >= COUNT_EVERY_MS) {
                 val counted = countToday(now, snap)
-                nm.notify(
-                    SERVICE_NOTIFICATION_ID,
-                    TodayNotifications.usage(this, counted.totalMs, counted.distractingMs, snap.colors)
-                )
+                val usage = TodayNotifications.usage(this, counted.totalMs, counted.distractingMs, snap.colors)
+                nm.notify(SERVICE_NOTIFICATION_ID, usage)
+                lastUsage = usage
                 lastCountMs = now
                 shownUsage = true
             }
