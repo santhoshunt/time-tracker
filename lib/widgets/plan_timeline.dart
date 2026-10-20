@@ -546,7 +546,7 @@ class GhostBlockTile extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: CustomPaint(
-          painter: _DashedBorderPainter(color: color.withValues(alpha: 0.6)),
+          painter: DashedBorderPainter(color: color.withValues(alpha: 0.6)),
           child: LayoutBuilder(
             builder: (context, box) {
               final h = box.maxHeight;
@@ -613,7 +613,7 @@ class _AddHint extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: CustomPaint(
-          painter: _DashedBorderPainter(
+          painter: DashedBorderPainter(
             color: c.textSecondary.withValues(alpha: 0.55),
           ),
           child: Center(
@@ -638,8 +638,8 @@ class _AddHint extends StatelessWidget {
   }
 }
 
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({required this.color});
+class DashedBorderPainter extends CustomPainter {
+  const DashedBorderPainter({required this.color});
 
   final Color color;
 
@@ -665,7 +665,7 @@ class _DashedBorderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DashedBorderPainter old) => old.color != color;
+  bool shouldRepaint(DashedBorderPainter old) => old.color != color;
 }
 
 class _NowLine extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'data/drift_db.dart';
 import 'data/repositories/app_repository.dart';
 import 'data/repositories/event_repository.dart';
+import 'data/repositories/group_repository.dart';
 import 'data/repositories/meta_repository.dart';
 import 'data/repositories/plan_repository.dart';
 import 'data/repositories/rule_repository.dart';
@@ -34,6 +35,7 @@ class AppServices {
        plans = PlanRepository(db),
        rules = RuleRepository(db),
        apps = AppRepository(db),
+       groups = GroupRepository(db),
        meta = MetaRepository(db) {
     ingestor = Ingestor(
       source: usage,
@@ -66,6 +68,7 @@ class AppServices {
   final PlanRepository plans;
   final RuleRepository rules;
   final AppRepository apps;
+  final GroupRepository groups;
   final MetaRepository meta;
   late final Ingestor ingestor;
 

@@ -12,8 +12,13 @@ import '../providers/settings_provider.dart';
 /// The `app` value every Drift backup carries.
 const backupApp = 'drift';
 
-/// The newest payload shape this build reads and writes.
-const backupVersion = 1;
+/// The newest payload shape this build reads and writes. Version 2
+/// (v0.7.0) adds the app group tables; a version 1 backup restores with no
+/// groups.
+const backupVersion = 2;
+
+/// The tables version 2 added; a version 1 backup has none of them.
+const _groupTables = {'app_groups', 'app_group_members', 'block_groups'};
 
 /// Every table a backup holds, in the order it is written back.
 /// `raw_events` is left out: it is pruned after a few days and every
@@ -28,6 +33,9 @@ const backupTables = [
   'sessions',
   'idle_spans',
   'gaps',
+  'app_groups',
+  'app_group_members',
+  'block_groups',
   'meta',
 ];
 
@@ -237,6 +245,11 @@ Map<String, List<Map<String, Object?>>> _validated(Map<String, dynamic> data) {
   final out = <String, List<Map<String, Object?>>>{};
   for (final t in backupTables) {
     final rows = raw[t];
+    // Restore replaces everything, so a version 1 backup clears groups.
+    if (rows == null && version == 1 && _groupTables.contains(t)) {
+      out[t] = const [];
+      continue;
+    }
     if (rows is! List || rows.any((r) => r is! Map)) {
       throw BackupFormatException('This Drift backup is missing the $t table.');
     }

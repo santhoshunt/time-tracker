@@ -41,6 +41,7 @@ Future<List<DayData>> loadDays(
   final idle = await s.sessions.idleBetween(from, to);
   final gaps = await s.sessions.gapsBetween(from, to);
   final rules = await s.rules.allRules();
+  final groups = await s.groups.snapshot();
   final overrides = await s.rules.overridesBetween(from, to);
   final apps = await s.apps.all();
   final categories = {for (final a in apps) a.p: a.category};
@@ -97,6 +98,7 @@ Future<List<DayData>> loadDays(
       overrides: overrides,
       categories: categories,
       now: now,
+      groups: groups,
     );
     out.add(DayData(
       day: day,

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'app_groups.dart';
 import 'category_guess.dart' as guess;
 import 'models.dart';
 
@@ -145,9 +146,16 @@ class NudgeSnapshot {
 /// The apps the distracting-time count treats specially, from the learned
 /// rules: (always distracting, never distracting). An off-track rule for
 /// any block wins over an on-track rule for another.
-(Set<String>, Set<String>) distractingRuleSets(Map<(String, String), Verdict> rules) {
-  final off = <String>{};
-  final on = <String>{};
+///
+/// With [groups]: a Distracting group's apps are always distracting, and a
+/// Productive group's apps are never, unless a rule or a Distracting group
+/// says otherwise.
+(Set<String>, Set<String>) distractingRuleSets(
+  Map<(String, String), Verdict> rules, [
+  AppGroups groups = AppGroups.none,
+]) {
+  final off = <String>{...groups.distractingApps};
+  final on = <String>{...groups.productiveApps};
   for (final MapEntry(key: (_, p), :value) in rules.entries) {
     if (value == Verdict.offTrack) off.add(p);
     if (value == Verdict.onTrack) on.add(p);
@@ -245,10 +253,16 @@ bool _inQuietHours(int minute, int start, int end) {
 /// Builds the windows for [blocks] (today's and tomorrow's, already placed
 /// on their days) from the learned rules, keeping only what has not ended
 /// by [now].
+///
+/// [groups] add to each window what the classifier would decide: a
+/// group's apps join `on` or `off` as the block uses the group (an app's
+/// own rule wins), and a Distracting group's apps join `off` wherever the
+/// block has not allowed them, so focus lock locks them too.
 List<NudgeWindow> nudgeWindows({
   required List<ResolvedBlock> blocks,
   required Map<(String, String), Verdict> rules,
   required DateTime now,
+  AppGroups groups = AppGroups.none,
 }) {
   final byKey = <String, (Set<String>, Set<String>)>{};
   for (final MapEntry(key: (key, p), :value) in rules.entries) {
@@ -256,17 +270,41 @@ List<NudgeWindow> nudgeWindows({
     if (value == Verdict.onTrack) sets.$1.add(p);
     if (value == Verdict.offTrack) sets.$2.add(p);
   }
+  final distracting = groups.distractingApps;
+
+  (Set<String>, Set<String>) setsFor(String key) {
+    final ruled = byKey[key];
+    final on = <String>{...?ruled?.$1};
+    final off = <String>{...?ruled?.$2};
+    final decided = {...on, ...off};
+    for (final g in groups.groups) {
+      for (final p in g.apps) {
+        if (decided.contains(p)) continue;
+        final v = groups.blockVerdict(key, p);
+        if (v == Verdict.onTrack) on.add(p);
+        if (v == Verdict.offTrack) off.add(p);
+      }
+    }
+    for (final p in distracting) {
+      if (!on.contains(p)) off.add(p);
+    }
+    return (on, off);
+  }
+
   final nowMs = now.millisecondsSinceEpoch;
   return [
     for (final b in blocks)
       if (b.end.millisecondsSinceEpoch > nowMs)
-        NudgeWindow(
-          startMs: math.max(b.start.millisecondsSinceEpoch, 0),
-          endMs: b.end.millisecondsSinceEpoch,
-          block: b.name,
-          anyApp: b.anyApp,
-          on: byKey[blockKey(b.name)]?.$1 ?? const {},
-          off: byKey[blockKey(b.name)]?.$2 ?? const {},
-        ),
+        () {
+          final (on, off) = setsFor(blockKey(b.name));
+          return NudgeWindow(
+            startMs: math.max(b.start.millisecondsSinceEpoch, 0),
+            endMs: b.end.millisecondsSinceEpoch,
+            block: b.name,
+            anyApp: b.anyApp,
+            on: on,
+            off: off,
+          );
+        }(),
   ];
 }

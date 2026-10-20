@@ -4,10 +4,10 @@ import 'package:sqflite/sqflite.dart';
 /// File name of Drift's database inside the app's databases folder.
 const driftDbFileName = 'drift.db';
 
-/// Schema version. Every table ships in version 1, so nothing needs a
-/// migration until a later release changes the shape; that release bumps
-/// this and adds an `onUpgrade` step.
-const driftDbVersion = 1;
+/// Schema version. Version 1 is the first release's tables; version 2
+/// (v0.7.0) adds the app group tables. Upgrades only ever create tables,
+/// so an old phone's rows are never rewritten.
+const driftDbVersion = 2;
 
 /// Opens (and on first run creates) Drift's database.
 ///
@@ -19,8 +19,32 @@ Future<Database> openDriftDb({String? path, DatabaseFactory? factory}) async {
   final dbPath = path ?? p.join(await dbFactory.getDatabasesPath(), driftDbFileName);
   return dbFactory.openDatabase(
     dbPath,
-    options: OpenDatabaseOptions(version: driftDbVersion, onCreate: _create),
+    options: OpenDatabaseOptions(
+      version: driftDbVersion,
+      onCreate: (db, version) async {
+        await _create(db, version);
+        await _addGroups(db);
+      },
+      onUpgrade: (db, from, to) async {
+        if (from < 2) await _addGroups(db);
+      },
+    ),
   );
+}
+
+/// Version 2: app groups. A group has a name, an emoji, a colour index and
+/// a kind ('productive' or 'distracting'); its apps are rows of
+/// `app_group_members`; `block_groups` links a block name key (as
+/// `app_rules` uses it) to a group with a verdict ('on' or 'off').
+Future<void> _addGroups(Database db) async {
+  final batch = db.batch()
+    ..execute('CREATE TABLE IF NOT EXISTS app_groups(id INTEGER PRIMARY KEY, '
+        'name TEXT, emoji TEXT, color_idx INTEGER, kind TEXT, sort INTEGER)')
+    ..execute('CREATE TABLE IF NOT EXISTS app_group_members(group_id INTEGER, '
+        'p TEXT, PRIMARY KEY(group_id, p))')
+    ..execute('CREATE TABLE IF NOT EXISTS block_groups(block_key TEXT, '
+        'group_id INTEGER, verdict TEXT, PRIMARY KEY(block_key, group_id))');
+  await batch.commit(noResult: true);
 }
 
 /// The schema from the plan, plus `meta` for the ingest cursor and the

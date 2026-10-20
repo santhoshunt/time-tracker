@@ -10,6 +10,7 @@ import '../services/day_loader.dart';
 import '../services/streak_loader.dart';
 import '../theme/drift_theme.dart';
 import '../theme/theme_id.dart';
+import '../widgets/day_start_strip.dart';
 import '../widgets/score_card.dart';
 import '../widgets/timeline_lanes.dart';
 import '../widgets/update_banner.dart';
@@ -134,12 +135,21 @@ class _TodayScreenState extends State<TodayScreen> {
 
     final week = _week;
     final now = _services.clock.now();
+    final firstAhead = data == null
+        ? null
+        : firstBlockAhead(data.blocks, data.score, data.now);
     final top = Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
+        // Full width in every state; a loose Column let the empty card
+        // shrink to its text.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const UpdateBanner(),
-          ScoreCard(score: data?.score, onPlan: widget.onPlan),
+          if (firstAhead != null)
+            DayStartStrip(first: firstAhead)
+          else
+            ScoreCard(score: data?.score, onPlan: widget.onPlan),
           if (week != null && week.hasPlan)
             WeekCard(
               progress: week,

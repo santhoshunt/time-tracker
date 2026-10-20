@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../app_services.dart';
+import '../domain/app_groups.dart';
 import '../domain/models.dart';
 import '../domain/plan_resolver.dart';
 import '../theme/drift_theme.dart';
+import '../widgets/group_style.dart';
 import '../widgets/plan_timeline.dart';
 import '../widgets/time_wheel.dart';
 
@@ -119,6 +121,14 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
   /// writes only the difference, and a rename moves exactly these.
   Map<String, Verdict> _initialRules = const {};
 
+  /// App groups, and the ones this block uses in each list (by id).
+  List<AppGroup> _groups = const [];
+  final _allowedGroups = <int>{};
+  final _offGroups = <int>{};
+
+  /// The links stored for the block's name when the editor opened.
+  Map<int, Verdict> _initialGroups = const {};
+
   List<AppInfo> _apps = const [];
   List<PlanBlock> _others = const [];
   bool _submitted = false;
@@ -153,8 +163,12 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
     final blocks = await _services.plans.allBlocks();
     final rules = await _services.rules.allRules();
     final apps = await _loadApps();
-    if (!mounted) return;
+    final groups = await _services.groups.all();
     final original = widget.block;
+    final linked = original == null
+        ? const <int, Verdict>{}
+        : await _services.groups.forBlock(original.name);
+    if (!mounted) return;
     final initial = <String, Verdict>{};
     if (original != null) {
       final key = blockKey(original.name);
@@ -165,9 +179,14 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
     setState(() {
       _others = blocks;
       _apps = apps;
+      _groups = groups;
+      _initialGroups = linked;
       _initialRules = initial;
       for (final MapEntry(key: p, :value) in initial.entries) {
         (value == Verdict.onTrack ? _allowed : _offTrack).add(p);
+      }
+      for (final MapEntry(key: id, :value) in linked.entries) {
+        (value == Verdict.onTrack ? _allowedGroups : _offGroups).add(id);
       }
     });
   }
@@ -288,6 +307,7 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
     }
 
     await _writeRules(original?.name, keepOldRules: keepOldRules);
+    await _writeGroups(original?.name, keepOld: keepOldRules);
     _services.bump();
     if (mounted) Navigator.of(context).pop();
   }
@@ -334,6 +354,37 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
       await rules.deleteRule(oldName, p);
     }
   }
+
+  /// Saves the group chips as `block_groups` under the block's name. On a
+  /// rename the old name's links go, unless the old name is still in use,
+  /// exactly as [_writeRules] treats app rules.
+  Future<void> _writeGroups(String? oldName, {required bool keepOld}) async {
+    final groups = _services.groups;
+    final newName = _name.text.trim();
+    final desired = <int, Verdict>{
+      for (final id in _allowedGroups) id: Verdict.onTrack,
+      for (final id in _offGroups) id: Verdict.offTrack,
+    };
+    final renamed = oldName != null && blockKey(oldName) != blockKey(newName);
+    if (!renamed && oldName != null) {
+      // Same name: replace only when the chips changed.
+      if (!_sameLinks(desired, _initialGroups)) await groups.setForBlock(newName, desired);
+      return;
+    }
+    // A new block, or a rename: another block may already use the name, so
+    // its links are kept and this block's are added on top.
+    if (desired.isNotEmpty) {
+      await groups.setForBlock(newName, {...await groups.forBlock(newName), ...desired});
+    }
+    if (oldName == null) return;
+    final oldKey = blockKey(oldName);
+    final stillUsed = keepOld ||
+        _others.any((b) => b.id != widget.block?.id && blockKey(b.name) == oldKey);
+    if (!stillUsed) await groups.setForBlock(oldName, const {});
+  }
+
+  static bool _sameLinks(Map<int, Verdict> a, Map<int, Verdict> b) =>
+      a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 
   Future<_Scope?> _askScope({
     required String title,
@@ -441,6 +492,8 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
   Future<void> _pickApps({required bool allowed}) async {
     final mine = allowed ? _allowed : _offTrack;
     final other = allowed ? _offTrack : _allowed;
+    final mineGroups = allowed ? _allowedGroups : _offGroups;
+    final otherGroups = allowed ? _offGroups : _allowedGroups;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -453,6 +506,17 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
         otherSelected: other,
         otherLabel: allowed ? 'In off-track apps' : 'In allowed apps',
         iconFor: _iconFor,
+        groups: _groups,
+        selectedGroups: mineGroups,
+        // A group is in one list per block, like an app.
+        onGroupChanged: (id, on) => setState(() {
+          if (on) {
+            otherGroups.remove(id);
+            mineGroups.add(id);
+          } else {
+            mineGroups.remove(id);
+          }
+        }),
         onChanged: (p, on) => setState(() {
           if (on) {
             // An app has one verdict per block, so picking it here takes
@@ -564,6 +628,8 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
               help: 'Count as on track in this block',
             ),
             _AppChips(
+              groups: [for (final g in _groups) if (_allowedGroups.contains(g.id)) g],
+              onRemoveGroup: (id) => setState(() => _allowedGroups.remove(id)),
               packages: _allowed.toList(),
               labelFor: _labelFor,
               iconFor: _iconFor,
@@ -575,6 +641,8 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
               help: 'Count as drift in this block',
             ),
             _AppChips(
+              groups: [for (final g in _groups) if (_offGroups.contains(g.id)) g],
+              onRemoveGroup: (id) => setState(() => _offGroups.remove(id)),
               packages: _offTrack.toList(),
               labelFor: _labelFor,
               iconFor: _iconFor,
@@ -868,6 +936,8 @@ class _ColourRow extends StatelessWidget {
 
 class _AppChips extends StatelessWidget {
   const _AppChips({
+    this.groups = const [],
+    this.onRemoveGroup,
     required this.packages,
     required this.labelFor,
     required this.iconFor,
@@ -875,6 +945,9 @@ class _AppChips extends StatelessWidget {
     required this.onRemove,
   });
 
+  /// Groups in this list, shown first as coloured outline chips.
+  final List<AppGroup> groups;
+  final ValueChanged<int>? onRemoveGroup;
   final List<String> packages;
   final String Function(String p) labelFor;
   final Future<Uint8List?> Function(String p) iconFor;
@@ -891,6 +964,11 @@ class _AppChips extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        for (final g in groups)
+          GroupChip(
+            group: g,
+            onDeleted: onRemoveGroup == null ? null : () => onRemoveGroup!(g.id!),
+          ),
         for (final p in packages)
           InputChip(
             avatar: AppIcon(
@@ -986,6 +1064,9 @@ class AppPickerSheet extends StatefulWidget {
     required this.otherLabel,
     required this.iconFor,
     required this.onChanged,
+    this.groups = const [],
+    this.selectedGroups = const {},
+    this.onGroupChanged,
   });
 
   final String title;
@@ -998,6 +1079,12 @@ class AppPickerSheet extends StatefulWidget {
   final Future<Uint8List?> Function(String p) iconFor;
   final void Function(String p, bool selected) onChanged;
 
+  /// App groups shown as chips above the list (chips option A). Picking
+  /// one links the whole group to this list; its apps then read "Via ...".
+  final List<AppGroup> groups;
+  final Set<int> selectedGroups;
+  final void Function(int id, bool selected)? onGroupChanged;
+
   @override
   State<AppPickerSheet> createState() => _AppPickerSheetState();
 }
@@ -1006,6 +1093,21 @@ class _AppPickerSheetState extends State<AppPickerSheet> {
   final _query = TextEditingController();
   late final Set<String> _picked = {...widget.selected};
   late final Set<String> _other = {...widget.otherSelected};
+  late final Set<int> _pickedGroups = {...widget.selectedGroups};
+
+  void _toggleGroup(int id) {
+    final on = !_pickedGroups.contains(id);
+    setState(() => on ? _pickedGroups.add(id) : _pickedGroups.remove(id));
+    widget.onGroupChanged?.call(id, on);
+  }
+
+  /// The first picked group holding [p], for the "Via ..." subtitle.
+  AppGroup? _viaGroup(String p) {
+    for (final g in widget.groups) {
+      if (_pickedGroups.contains(g.id) && g.apps.contains(p)) return g;
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -1058,6 +1160,7 @@ class _AppPickerSheetState extends State<AppPickerSheet> {
         itemBuilder: (context, i) {
           final a = shown[i];
           final on = _picked.contains(a.p);
+          final via = _viaGroup(a.p);
           return ListTile(
             onTap: () => _toggle(a.p),
             leading: AppIcon(
@@ -1067,9 +1170,19 @@ class _AppPickerSheetState extends State<AppPickerSheet> {
               iconFor: widget.iconFor,
             ),
             title: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: _other.contains(a.p) ? Text(widget.otherLabel) : null,
+            subtitle: via != null
+                ? Text('Via ${via.name}')
+                : _other.contains(a.p)
+                ? Text(widget.otherLabel)
+                : null,
+            // An app covered by a picked group is already in; an outlined
+            // tick says so without claiming its own rule.
             trailing: Icon(
-              on ? Icons.check_circle : Icons.radio_button_unchecked,
+              on
+                  ? Icons.check_circle
+                  : via != null
+                  ? Icons.check_circle_outline
+                  : Icons.radio_button_unchecked,
               color: on ? c.accent : c.textSecondary,
             ),
           );
@@ -1096,6 +1209,22 @@ class _AppPickerSheetState extends State<AppPickerSheet> {
                 ],
               ),
             ),
+            if (widget.groups.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final g in widget.groups)
+                      GroupChip(
+                        group: g,
+                        selected: _pickedGroups.contains(g.id),
+                        onTap: () => _toggleGroup(g.id!),
+                      ),
+                  ],
+                ),
+              ),
             if (widget.apps.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

@@ -15,6 +15,7 @@ import '../widgets/settings_group.dart';
 import '../widgets/time_wheel.dart';
 import '../widgets/undo_snackbar.dart';
 import '../widgets/update_sheet.dart';
+import 'app_groups_screen.dart';
 import 'diagnostics_screen.dart';
 import 'icon_picker_screen.dart';
 import 'rules_screen.dart';
@@ -377,6 +378,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsGroup(
               title: 'Data',
               children: [
+                SettingsRow(
+                  title: 'App groups',
+                  subtitle: 'Productive and distracting apps, picked as one',
+                  onTap: () => _open(const AppGroupsScreen()),
+                ),
                 SettingsRow(
                   title: 'Week starts on',
                   value: settings.firstWeekday == DateTime.sunday

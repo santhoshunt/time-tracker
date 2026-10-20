@@ -33,7 +33,8 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
     ...resolvePlan(today.end, all),
   ];
   final rules = await s.rules.allRules();
-  final (offApps, onApps) = distractingRuleSets(rules);
+  final groups = await s.groups.snapshot();
+  final (offApps, onApps) = distractingRuleSets(rules, groups);
   return NudgeSnapshot(
     writtenAtMs: now.millisecondsSinceEpoch,
     enabled: settings.nudgesEnabled,
@@ -46,7 +47,7 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
     reminders: settings.blockReminders,
     offApps: offApps,
     onApps: onApps,
-    windows: nudgeWindows(blocks: blocks, rules: rules, now: now),
+    windows: nudgeWindows(blocks: blocks, rules: rules, now: now, groups: groups),
     colors: {
       'bg': _hex(colors.bg),
       'card': _hex(colors.card),

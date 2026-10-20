@@ -1,4 +1,5 @@
 import '../platform/usage_source.dart';
+import 'app_groups.dart';
 import 'category_guess.dart';
 import 'models.dart';
 import 'plan_resolver.dart';
@@ -19,6 +20,7 @@ List<Segment> splitAndClassify({
   required Map<int, Verdict> overrides,
   required Map<String, String> categories,
   required DateTime now,
+  AppGroups groups = AppGroups.none,
 }) {
   final frame = DayFrame.local(day);
   return classifyFrame(
@@ -32,6 +34,7 @@ List<Segment> splitAndClassify({
     overrides: overrides,
     categories: categories,
     now: now,
+    groups: groups,
   );
 }
 
@@ -45,9 +48,10 @@ List<Segment> splitAndClassify({
 /// - Gap time is [Verdict.noData]; gaps win over sessions, because a
 ///   session crossing a gap was stitched from incomplete events.
 /// - Session time inside a block is judged by, in order: an override for
-///   the session id, a rule for (block key, package), the block's anyApp
-///   flag (on track), then the guess from the app's category (missing
-///   category counts as `undefined`).
+///   the session id, a rule for (block key, package), a group the block
+///   uses ([AppGroups.blockVerdict]), the block's anyApp flag (on track),
+///   membership of a Distracting group (off track), then the guess from
+///   the app's category (missing category counts as `undefined`).
 /// - Time inside a block with no session is [Verdict.idle], whether an
 ///   idle span covers it or nothing does: either way no app was in use.
 /// - Time outside every block is [Verdict.unplanned], with the package
@@ -66,6 +70,7 @@ List<Segment> classifyFrame({
   required Map<int, Verdict> overrides,
   required Map<String, String> categories,
   required DateTime now,
+  AppGroups groups = AppGroups.none,
 }) {
   final fromMs = dayStart.millisecondsSinceEpoch;
   final toMs = (now.isBefore(dayEnd) ? now : dayEnd).millisecondsSinceEpoch;
@@ -138,7 +143,7 @@ List<Segment> classifyFrame({
         p: session.p,
         start: start,
         end: end,
-        verdict: _judge(session, block, rules, overrides, categories),
+        verdict: _judge(session, block, rules, overrides, categories, groups),
         blockName: block.name,
         sessionId: session.id,
       );
@@ -154,13 +159,19 @@ Verdict _judge(
   Map<(String, String), Verdict> rules,
   Map<int, Verdict> overrides,
   Map<String, String> categories,
+  AppGroups groups,
 ) {
   final id = session.id;
   final override = id == null ? null : overrides[id];
   if (override == Verdict.onTrack || override == Verdict.offTrack) return override!;
-  final rule = rules[(blockKey(block.name), session.p)];
+  final key = blockKey(block.name);
+  final rule = rules[(key, session.p)];
   if (rule == Verdict.onTrack || rule == Verdict.offTrack) return rule!;
+  final grouped = groups.blockVerdict(key, session.p);
+  if (grouped != null) return grouped;
   if (block.anyApp) return Verdict.onTrack;
+  // A Distracting group is a standing answer, so it is drift, not a guess.
+  if (groups.isDistractingMember(session.p)) return Verdict.offTrack;
   return guessFor(categories[session.p] ?? AppCategories.undefined);
 }
 

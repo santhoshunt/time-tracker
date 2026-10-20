@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:drift_time/app_services.dart';
+import 'package:drift_time/domain/app_groups.dart';
 import 'package:drift_time/domain/ingestor.dart';
 import 'package:drift_time/domain/models.dart';
 import 'package:drift_time/providers/settings_provider.dart';
@@ -51,6 +52,14 @@ Future<void> _seedAll(AppServices s) async {
     'blocks_json': '[{"name":"Read","startMin":600,"endMin":660}]',
   });
   await s.db.insert('gaps', {'start_ms': 1760900000000, 'end_ms': 1760903600000});
+  final groupId = await s.groups.save(const AppGroup(
+    name: 'Time sinks',
+    emoji: 'x',
+    colorIdx: 4,
+    kind: GroupKind.distracting,
+    apps: {'com.example.video', 'com.example.social'},
+  ));
+  await s.groups.setForBlock('Deep work', {groupId: Verdict.offTrack});
   await s.db.insert('meta', {'key': 'ingest_cursor', 'value': '1760910000000'});
   await s.db.insert('raw_events', {
     't': 1760910000000,
@@ -128,7 +137,7 @@ void main() {
 
     test('exports every table but raw_events, and every setting', () {
       expect(decoded['app'], 'drift');
-      expect(decoded['version'], 1);
+      expect(decoded['version'], 2);
       expect(DateTime.tryParse(decoded['exportedAt'] as String), isNotNull);
       final tables = decoded['tables'] as Map<String, dynamic>;
       expect(tables.keys.toSet(), backupTables.toSet());
@@ -298,7 +307,7 @@ void main() {
     });
 
     test('a backup from a newer Drift', () async {
-      final newer = Map<String, dynamic>.of(valid)..['version'] = 2;
+      final newer = Map<String, dynamic>.of(valid)..['version'] = 3;
       await expectLater(
         importAll(to, settings, newer),
         throwsA(
@@ -322,6 +331,39 @@ void main() {
         throwsA(isA<BackupFormatException>()),
       );
       await expectUnchanged();
+    });
+
+    test('a version 2 backup missing a group table', () async {
+      final tables = Map<String, dynamic>.of(
+        valid['tables'] as Map<String, dynamic>,
+      )..remove('block_groups');
+      final partial = Map<String, dynamic>.of(valid)..['tables'] = tables;
+      await expectLater(
+        importAll(to, settings, partial),
+        throwsA(isA<BackupFormatException>()),
+      );
+      await expectUnchanged();
+    });
+
+    test('a version 1 backup restores, and clears the groups', () async {
+      await to.groups.save(const AppGroup(
+        name: 'Mine',
+        emoji: 'x',
+        colorIdx: 0,
+        kind: GroupKind.productive,
+        apps: {'com.mine'},
+      ));
+      final tables = Map<String, dynamic>.of(valid['tables'] as Map<String, dynamic>)
+        ..remove('app_groups')
+        ..remove('app_group_members')
+        ..remove('block_groups');
+      final v1 = Map<String, dynamic>.of(valid)
+        ..['version'] = 1
+        ..['tables'] = tables;
+      await importAll(to, settings, v1);
+      expect(await to.groups.all(), isEmpty);
+      expect(await to.db.query('block_groups'), isEmpty);
+      expect((await to.plans.allBlocks()).map((b) => b.name), contains('Deep work'));
     });
 
     test('a row that fails to insert rolls every table back', () async {
