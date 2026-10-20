@@ -78,6 +78,11 @@ class AppServices {
 
   void bump() => revision.value++;
 
+  /// Guessed (block, app) pairs waiting in Learned rules > Not sorted. The
+  /// home shell recounts it after every [revision]; the Settings tab badge
+  /// and the Learned rules row show it.
+  final ValueNotifier<int> toSort = ValueNotifier(0);
+
   Future<IngestResult?>? _running;
 
   /// Runs one ingest unless one is already running, then bumps

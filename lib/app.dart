@@ -23,6 +23,7 @@ import 'services/evening_summary.dart';
 import 'services/widget_snapshot.dart';
 import 'services/period_loader.dart';
 import 'services/nudge_sync.dart';
+import 'services/unsorted_loader.dart';
 import 'services/update_installer.dart';
 import 'services/update_launch_check.dart';
 import 'widgets/ask_sheet.dart';
@@ -112,10 +113,11 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
-
-  /// Guessed apps still waiting for an answer today: the Today badge.
-  int _asks = 0;
   bool _asking = false;
+
+  /// Counts recounts of [AppServices.toSort], so a slow one that finishes
+  /// after a newer one is dropped.
+  int _countGeneration = 0;
   late final AppServices _services;
   late final SettingsProvider _settings;
   late final DriveBackupService _drive;
@@ -200,8 +202,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Future<void> _onDataChanged() async {
     _syncNudges();
     unawaited(writeWidgetSnapshot(_services, _settings));
-    final day = await loadDay(_services, _services.clock.now());
-    if (mounted) setState(() => _asks = day.unanswered.length);
+    final generation = ++_countGeneration;
+    final unsorted = await loadUnsorted(_services);
+    if (mounted && generation == _countGeneration) {
+      _services.toSort.value = unsorted.length;
+    }
   }
 
   void _syncNudges() {
@@ -270,17 +275,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: [
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: _asks > 0,
-              label: Text('$_asks'),
-              child: const Icon(Icons.schedule_outlined),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: _asks > 0,
-              label: Text('$_asks'),
-              child: const Icon(Icons.schedule),
-            ),
+          const NavigationDestination(
+            icon: Icon(Icons.schedule_outlined),
+            selectedIcon: Icon(Icons.schedule),
             label: 'Today',
           ),
           const NavigationDestination(
@@ -298,13 +295,38 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             selectedIcon: Icon(Icons.donut_large),
             label: 'Usage',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+          NavigationDestination(
+            icon: _ToSortBadge(
+              count: _services.toSort,
+              child: const Icon(Icons.settings_outlined),
+            ),
+            selectedIcon: _ToSortBadge(
+              count: _services.toSort,
+              child: const Icon(Icons.settings),
+            ),
             label: 'Settings',
           ),
         ],
       ),
     );
   }
+}
+
+/// [child] with a badge holding [count] while it is above zero.
+class _ToSortBadge extends StatelessWidget {
+  const _ToSortBadge({required this.count, required this.child});
+
+  final ValueListenable<int> count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: count,
+    builder: (context, n, child) => Badge(
+      isLabelVisible: n > 0,
+      label: Text('$n'),
+      child: child,
+    ),
+    child: child,
+  );
 }

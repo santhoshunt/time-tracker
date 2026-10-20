@@ -103,6 +103,46 @@ class PlanRepository {
     });
   }
 
+  /// Renames the block with [id] from [oldName] to [name] in every frozen
+  /// day that holds it. A rename moves the block's answers to the new
+  /// name, and past days look them up by the name they were frozen with.
+  /// Times and apps stay as they were.
+  ///
+  /// Block ids are reused after a delete, so an entry with this id but
+  /// another name is a deleted block's history and is left alone.
+  Future<void> renameInFrozen(int id, String oldName, String name) => db.transaction((txn) async {
+    final oldKey = blockKey(oldName);
+    final rows = await txn.query('day_plans', columns: ['date', 'blocks_json']);
+    for (final r in rows) {
+      final List<dynamic> blocks;
+      try {
+        final decoded = jsonDecode(r['blocks_json'] as String);
+        if (decoded is! List) continue;
+        blocks = decoded;
+      } on FormatException {
+        continue;
+      }
+      var changed = false;
+      for (final b in blocks) {
+        if (b is Map<String, dynamic> &&
+            b['id'] == id &&
+            b['name'] is String &&
+            blockKey(b['name'] as String) == oldKey &&
+            b['name'] != name) {
+          b['name'] = name;
+          changed = true;
+        }
+      }
+      if (!changed) continue;
+      await txn.update(
+        'day_plans',
+        {'blocks_json': jsonEncode(blocks)},
+        where: 'date = ?',
+        whereArgs: [r['date']],
+      );
+    }
+  });
+
   static Map<String, Object?> _blockToRow(PlanBlock b) => {
         'id': b.id,
         'name': b.name,

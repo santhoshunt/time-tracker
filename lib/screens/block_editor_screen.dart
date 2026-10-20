@@ -306,6 +306,12 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
       );
     }
 
+    // A rename on every day reaches the past days too, or their answers
+    // would stay under a name no rule uses any more.
+    final id = original?.id;
+    if (id != null && !keepOldRules && original!.name.trim() != _name.text.trim()) {
+      await plans.renameInFrozen(id, original.name, _name.text.trim());
+    }
     await _writeRules(original?.name, keepOldRules: keepOldRules);
     await _writeGroups(original?.name, keepOld: keepOldRules);
     _services.bump();

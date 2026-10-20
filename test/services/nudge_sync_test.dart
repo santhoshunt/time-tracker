@@ -176,6 +176,15 @@ void main() {
       expect(find.text('Learned rules'), findsOneWidget);
     });
 
+    testWidgets('the Learned rules row shows how many apps wait to be sorted', (tester) async {
+      await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('to sort'), findsNothing);
+      s.toSort.value = 3;
+      await tester.pump();
+      expect(find.text('3 to sort'), findsOneWidget);
+    });
+
     testWidgets('picking a new threshold saves it', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();

@@ -158,7 +158,7 @@ void main() {
       await openNotSorted(tester);
 
       final row = unsortedRow('deep work', 'com.example.chat');
-      expect(find.descendant(of: row, matching: find.text('Deep work · guess off')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Guessed off track')), findsOneWidget);
       await tester.tap(find.descendant(of: row, matching: find.byTooltip('On track')));
       await tester.pumpAndSettle();
 
@@ -188,7 +188,9 @@ void main() {
       expect(find.text('Not sorted (1)'), findsOneWidget);
     });
 
-    testWidgets('a pair used on several days shows once, newest first', (tester) async {
+    testWidgets('a pair used on several days shows once, under its block, newest first', (
+      tester,
+    ) async {
       await seedSampleDay(s, testNow);
       await seedFriday();
       await pumpRules(tester);
@@ -197,15 +199,38 @@ void main() {
       await openNotSorted(tester);
 
       expect(find.text('WhatsApp'), findsOneWidget);
+      // Deep work was used last, so its heading comes first; Spotify from
+      // Friday sits under it, above the Gym heading.
       final ys = [
         for (final r in [
+          find.text('Deep work'),
           unsortedRow('deep work', 'com.example.chat'),
-          unsortedRow('gym', 'com.example.music'),
           unsortedRow('deep work', 'com.example.music'),
+          find.text('Gym'),
+          unsortedRow('gym', 'com.example.music'),
         ])
           tester.getTopLeft(r).dy,
       ];
       expect(ys, orderedEquals([...ys]..sort()));
+      // Spotify waits in two blocks, once under each heading.
+      expect(find.text('Spotify'), findsNWidgets(2));
+    });
+
+    testWidgets('the count it shows is the one the Settings badge reads', (tester) async {
+      await seedSampleDay(s, testNow);
+      await seedFriday();
+      await pumpRules(tester);
+      expect(s.toSort.value, 3);
+
+      await openNotSorted(tester);
+      await tester.tap(
+        find.descendant(
+          of: unsortedRow('gym', 'com.example.music'),
+          matching: find.byTooltip('Off track'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(s.toSort.value, 2);
     });
 
     testWidgets('a rule stored elsewhere drops the row on the next revision', (tester) async {

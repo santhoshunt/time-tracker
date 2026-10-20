@@ -331,10 +331,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: settings.setBlockReminders,
                   ),
                 ),
-                SettingsRow(
-                  title: 'Learned rules',
-                  subtitle: 'Apps you marked for each block',
-                  onTap: () => _open(const RulesScreen()),
+                ValueListenableBuilder<int>(
+                  valueListenable: context.read<AppServices>().toSort,
+                  builder: (context, n, _) => SettingsRow(
+                    title: 'Learned rules',
+                    subtitle: 'Apps you marked for each block',
+                    value: n > 0 ? '$n to sort' : null,
+                    onTap: () => _open(const RulesScreen()),
+                  ),
                 ),
               ],
             ),

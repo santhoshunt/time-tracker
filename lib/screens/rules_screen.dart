@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../app_services.dart';
 import '../domain/models.dart';
-import '../services/period_loader.dart';
+import '../services/unsorted_loader.dart';
 import '../theme/drift_theme.dart';
 import '../widgets/ask_sheet.dart';
 import '../widgets/settings_group.dart';
@@ -36,39 +36,12 @@ class _Group {
   final List<_Rule> rules;
 }
 
-/// One (block, app) pair Drift has only guessed about, as the Not sorted
-/// tab shows it.
-class _Unsorted {
-  const _Unsorted({
-    required this.blockName,
-    required this.p,
-    required this.label,
-    required this.guess,
-    required this.start,
-  });
-
-  /// The block's own spelling on the day the app was last used in it.
-  final String blockName;
-  final String p;
-  final String label;
-
-  /// [Verdict.guessedOn] or [Verdict.guessedOff].
-  final Verdict guess;
-
-  /// When the newest guessed use started; the list sorts on it.
-  final DateTime start;
-
-  (String, String) get id => (blockKey(blockName), p);
-}
-
-/// How many days back, today included, the Not sorted tab looks.
-const _unsortedDays = 14;
-
 /// Learned rules option B: two tabs. Sorted is option A, every (block,
 /// app) answer grouped by block with an On track or Off track tag; tap a
 /// row to switch it, swipe it to forget it (with Undo). Not sorted lists
 /// the apps used in a block over the last 14 days that have only a guess,
-/// each with a tick and a cross that store the answer.
+/// under the same block headings, each with a tick and a cross that store
+/// the answer.
 class RulesScreen extends StatefulWidget {
   const RulesScreen({super.key});
 
@@ -79,7 +52,7 @@ class RulesScreen extends StatefulWidget {
 class _RulesScreenState extends State<RulesScreen> {
   late final AppServices _services;
   List<_Group>? _groups;
-  List<_Unsorted>? _unsorted;
+  List<UnsortedPair>? _unsorted;
 
   /// Answers being written. A load that read the database before the write
   /// landed must not bring the row back.
@@ -108,7 +81,7 @@ class _RulesScreenState extends State<RulesScreen> {
   Future<void> _load() async {
     final generation = ++_generation;
     final groups = await _loadGroups();
-    final unsorted = await _loadUnsorted();
+    final unsorted = await loadUnsorted(_services);
     if (!mounted || generation != _generation) return;
     setState(() {
       // A rule being forgotten stays gone even if this load read it first.
@@ -122,32 +95,7 @@ class _RulesScreenState extends State<RulesScreen> {
           if (!_pending.contains(u.id)) u,
       ];
     });
-  }
-
-  /// Every guessed (block, app) pair from the last [_unsortedDays] days,
-  /// one row per pair (the newest use wins), newest first.
-  Future<List<_Unsorted>> _loadUnsorted() async {
-    final now = _services.clock.now();
-    final days = await loadDays(
-      _services,
-      DateTime(now.year, now.month, now.day - (_unsortedDays - 1)),
-      now,
-    );
-    final byPair = <(String, String), _Unsorted>{};
-    for (final day in days) {
-      for (final s in day.unanswered) {
-        final u = _Unsorted(
-          blockName: s.blockName!.trim(),
-          p: s.p!,
-          label: day.labelOf(s.p),
-          guess: s.verdict,
-          start: s.start,
-        );
-        final seen = byPair[u.id];
-        if (seen == null || u.start.isAfter(seen.start)) byPair[u.id] = u;
-      }
-    }
-    return byPair.values.toList()..sort((a, b) => b.start.compareTo(a.start));
+    _services.toSort.value = _unsorted!.length;
   }
 
   Future<List<_Group>> _loadGroups() async {
@@ -227,10 +175,11 @@ class _RulesScreenState extends State<RulesScreen> {
 
   /// Stores [verdict] for every block named like [u]'s, then lets the
   /// reload move the pair to Sorted.
-  Future<void> _answer(_Unsorted u, Verdict verdict) async {
+  Future<void> _answer(UnsortedPair u, Verdict verdict) async {
     if (!_pending.add(u.id)) return;
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _unsorted?.remove(u));
+    _services.toSort.value = _unsorted?.length ?? 0;
     try {
       await _services.rules.upsertRule(
         u.blockName,
@@ -302,29 +251,39 @@ class _RulesScreenState extends State<RulesScreen> {
         message: 'Nothing waiting. Drift asks about new apps as you use them.',
       );
     }
+    // One heading per block, as on Sorted: the block used most recently
+    // first, and the newest app first inside it. The answer is per block,
+    // so an app used in two blocks is asked about under each.
+    final byBlock = <String, List<UnsortedPair>>{};
+    for (final u in unsorted) {
+      (byBlock[u.id.$1] ??= []).add(u);
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'Apps used in a block that Drift has only guessed about. '
-            'Tick if the app fits the block, cross if it does not.',
+            'Apps used in a block over the last $unsortedDays days that '
+            'Drift has only guessed about. Tick if the app fits the block, '
+            'cross if it does not.',
             style: text.bodySmall?.copyWith(color: c.textSecondary),
           ),
         ),
-        SettingsGroup(
-          title: 'Last $_unsortedDays days',
-          children: [
-            for (final u in unsorted)
-              _UnsortedRow(
-                key: ValueKey('unsorted|${u.id.$1}|${u.p}'),
-                item: u,
-                services: _services,
-                onAnswer: (v) => _answer(u, v),
-              ),
-          ],
-        ),
+        for (final MapEntry(:key, value: pairs) in byBlock.entries)
+          SettingsGroup(
+            key: ValueKey('unsortedGroup|$key'),
+            title: pairs.first.blockName,
+            children: [
+              for (final u in pairs)
+                _UnsortedRow(
+                  key: ValueKey('unsorted|${u.id.$1}|${u.p}'),
+                  item: u,
+                  services: _services,
+                  onAnswer: (v) => _answer(u, v),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -409,8 +368,8 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// One guessed pair: the app, "Deep work · guess on" or "guess off", and a
-/// tick and a cross in the verdict colours.
+/// One guessed pair under its block's heading: the app, "Guessed on track"
+/// or "Guessed off track", and a tick and a cross in the verdict colours.
 class _UnsortedRow extends StatelessWidget {
   const _UnsortedRow({
     super.key,
@@ -419,7 +378,7 @@ class _UnsortedRow extends StatelessWidget {
     required this.onAnswer,
   });
 
-  final _Unsorted item;
+  final UnsortedPair item;
   final AppServices services;
   final ValueChanged<Verdict> onAnswer;
 
@@ -427,10 +386,9 @@ class _UnsortedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
-    // A no-break space keeps "guess on" whole when the line wraps.
     final guess = item.guess == Verdict.guessedOff
-        ? 'guess off'
-        : 'guess on';
+        ? 'Guessed off track'
+        : 'Guessed on track';
     return Material(
       color: c.card,
       child: ConstrainedBox(
@@ -459,7 +417,7 @@ class _UnsortedRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${item.blockName} · $guess',
+                      guess,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: text.bodySmall?.copyWith(color: c.textSecondary),
