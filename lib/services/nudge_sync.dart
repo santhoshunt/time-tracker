@@ -32,6 +32,8 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
     ...resolvePlan(today.start, all),
     ...resolvePlan(today.end, all),
   ];
+  final rules = await s.rules.allRules();
+  final (offApps, onApps) = distractingRuleSets(rules);
   return NudgeSnapshot(
     writtenAtMs: now.millisecondsSinceEpoch,
     enabled: settings.nudgesEnabled,
@@ -40,11 +42,11 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
     quietStartMin: settings.quietStartMin,
     quietEndMin: settings.quietEndMin,
     lock: settings.focusLock,
-    windows: nudgeWindows(
-      blocks: blocks,
-      rules: await s.rules.allRules(),
-      now: now,
-    ),
+    status: settings.todayNotifications,
+    reminders: settings.blockReminders,
+    offApps: offApps,
+    onApps: onApps,
+    windows: nudgeWindows(blocks: blocks, rules: rules, now: now),
     colors: {
       'bg': _hex(colors.bg),
       'card': _hex(colors.card),
@@ -52,6 +54,7 @@ Future<NudgeSnapshot> buildNudgeSnapshot(
       'textSecondary': _hex(colors.textSecondary),
       'accent': _hex(colors.accent),
       'onAccent': _hex(colors.onAccent),
+      'offTrack': _hex(colors.offTrack),
     },
   );
 }
@@ -81,7 +84,12 @@ Future<void> syncNudges(
     await tmp.rename(target.path);
 
     if (!startService) return;
-    if (settings.nudgesEnabled && await s.usage.hasUsageAccess()) {
+    // The service draws the Today notifications and books the reminders
+    // too, so any of the three keeps it running.
+    final wanted = settings.nudgesEnabled ||
+        settings.todayNotifications ||
+        settings.blockReminders;
+    if (wanted && await s.usage.hasUsageAccess()) {
       await s.nudges.startService();
     } else {
       await s.nudges.stopService();

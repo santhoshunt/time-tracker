@@ -28,6 +28,8 @@ class SettingsProvider extends ChangeNotifier {
   static const _kLastUpdateMs = 'update_last_success_ms_v1';
   static const _kFocusLock = 'focus_lock_v1';
   static const _kWeeklyTarget = 'weekly_target_v1';
+  static const _kTodayNotifications = 'today_notifications_v1';
+  static const _kBlockReminders = 'block_reminders_v1';
 
   /// The weekly target when none is saved: the week's score Sandy aims at.
   static const defaultWeeklyTarget = 80;
@@ -51,8 +53,17 @@ class SettingsProvider extends ChangeNotifier {
   int _summaryMinute = 21 * 60 + 30;
   bool _focusLock = false;
   int _weeklyTarget = defaultWeeklyTarget;
+  bool _todayNotifications = true;
+  bool _blockReminders = true;
 
   ThemeId get theme => _theme;
+
+  /// The two silent notifications: the block now (or next), and today's
+  /// distracting time against all app time. On by default.
+  bool get todayNotifications => _todayNotifications;
+
+  /// Heads-ups 5 minutes before a block and when it starts. On by default.
+  bool get blockReminders => _blockReminders;
 
   /// Focus lock: apps marked off track for a block are locked during it
   /// instead of nudged. Off by default; it is the stronger tool.
@@ -155,7 +166,29 @@ class SettingsProvider extends ChangeNotifier {
       () => _clampTarget(prefs.getInt(_kWeeklyTarget) ?? defaultWeeklyTarget),
       defaultWeeklyTarget,
     );
+    _todayNotifications = _read(
+      () => prefs.getBool(_kTodayNotifications) ?? true,
+      true,
+    );
+    _blockReminders = _read(() => prefs.getBool(_kBlockReminders) ?? true, true);
     notifyListeners();
+  }
+
+  Future<void> setTodayNotifications(bool value) async {
+    if (value == _todayNotifications) return;
+    _todayNotifications = value;
+    notifyListeners();
+    await _persist(
+      _kTodayNotifications,
+      (p) => p.setBool(_kTodayNotifications, value),
+    );
+  }
+
+  Future<void> setBlockReminders(bool value) async {
+    if (value == _blockReminders) return;
+    _blockReminders = value;
+    notifyListeners();
+    await _persist(_kBlockReminders, (p) => p.setBool(_kBlockReminders, value));
   }
 
   static int _clampTarget(int v) => v <= 0 ? 0 : v.clamp(50, 100);

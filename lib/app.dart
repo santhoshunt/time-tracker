@@ -170,8 +170,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     unawaited(_drive.checkAndRunScheduled(_services, _settings));
   }
 
-  /// An evening summary tap carries `review:YYYY-MM-DD`: open that day.
+  /// Payloads of the tabs the Today notifications open
+  /// (TodayNotifications.kt).
+  static const tabPayloads = {'tab:today': 0, 'tab:usage': 3};
+
+  /// A Today notification carries `tab:today` or `tab:usage`; an evening
+  /// summary tap carries `review:YYYY-MM-DD`: open that day.
   void _onPayload(String payload) {
+    final tab = tabPayloads[payload];
+    if (tab != null) {
+      if (mounted) setState(() => _tab = tab);
+      return;
+    }
     final day = reviewDayOf(payload);
     if (day == null || !mounted) return;
     setState(() => _tab = 2);

@@ -48,7 +48,15 @@ class NudgeService : Service() {
         const val KEY_LAST_NUDGE = "nudge_last_ms"
         const val KEY_LAST_ERROR = "service_last_error"
         const val NUDGE_NOTIFICATION_ID = 1802
+        /** The foreground notification: the usage numbers while "Today in
+         * notifications" is on, "Drift is watching your plan" otherwise. */
         private const val SERVICE_NOTIFICATION_ID = 1801
+
+        /** How often the Today usage numbers are counted again. */
+        private const val COUNT_EVERY_MS = 60_000L
+
+        /** How long the list of launchable apps is reused. */
+        private const val LAUNCHABLE_REFRESH_MS = 30L * 60 * 1000
         private const val TICK_MS = 60_000L
 
         /** With focus lock on, an app has to be caught within seconds of
@@ -116,10 +124,26 @@ class NudgeService : Service() {
     private var snapshotStamp: Pair<Long, Long>? = null
     private var snapshot: NudgeSnapshot? = null
 
+    // The Today notifications, also tick-thread only.
+    private var lastCountMs = 0L
+    private var shownUsage = false
+    private var shownBlock: TodayStatus.Line? = null
+    private var scheduledFor: NudgeSnapshot? = null
+    private var launchable: Set<String> = emptySet()
+    private var launchableAtMs = 0L
+    private val categories = HashMap<String, String>()
+
     private val tick = object : Runnable {
         override fun run() {
             try {
                 tickOnce()
+            } catch (e: Exception) {
+                recordError(this@NudgeService, e)
+            }
+            // Separate, so a nudge failure never stops the Today
+            // notifications, or the other way round.
+            try {
+                todayTick(System.currentTimeMillis())
             } catch (e: Exception) {
                 recordError(this@NudgeService, e)
             }
@@ -171,7 +195,96 @@ class NudgeService : Service() {
         thread.quitSafely()
         main.post { NudgeOverlay.dismiss() }
         getSystemService(NotificationManager::class.java)?.cancel(NUDGE_NOTIFICATION_ID)
+        // The reminder alarm stays booked: heads-ups still come while the
+        // service is stopped.
+        TodayNotifications.cancelBlock(this)
         super.onDestroy()
+    }
+
+    /**
+     * The Today notifications: the block line every tick (re-posted only
+     * when its words change), the usage numbers at most once a minute, any
+     * reminder an alarm missed, and a new alarm whenever Dart rewrote the
+     * snapshot.
+     */
+    private fun todayTick(now: Long) {
+        val snap = readSnapshot()
+        if (snap !== scheduledFor) {
+            scheduledFor = snap
+            TodayNotifications.scheduleNext(this, snap, now)
+        }
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        if (snap == null || !snap.status || !TodayNotifications.canPost(this)) {
+            if (shownBlock != null) TodayNotifications.cancelBlock(this)
+            shownBlock = null
+            if (shownUsage) {
+                nm.notify(SERVICE_NOTIFICATION_ID, serviceNotification())
+                shownUsage = false
+            }
+        } else {
+            TodayNotifications.createChannels(this)
+            val line = TodayNotifications.blockLine(snap, now)
+            if (line != shownBlock) {
+                TodayNotifications.postBlock(this, line)
+                shownBlock = line
+            }
+            if (!shownUsage || now - lastCountMs >= COUNT_EVERY_MS) {
+                val counted = countToday(now, snap)
+                nm.notify(
+                    SERVICE_NOTIFICATION_ID,
+                    TodayNotifications.usage(this, counted.totalMs, counted.distractingMs, snap.colors)
+                )
+                lastCountMs = now
+                shownUsage = true
+            }
+        }
+        if (snap != null) TodayNotifications.postDueReminder(this, snap, now)
+    }
+
+    /**
+     * Today's app time from usage events, counted as the Usage tab counts
+     * (DayUsage, held to the Dart copy by usage_count_cases.json). Events are
+     * read from 3 hours before midnight, so an app already open at midnight
+     * is seen, and only time from midnight counts.
+     */
+    private fun countToday(now: Long, snap: NudgeSnapshot): DayUsage.Counted {
+        if (!UsageBridge.hasUsageAccess(this)) return DayUsage.Counted(0, 0)
+        val zone = java.time.ZoneId.systemDefault()
+        val dayStart = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+        val events = UsageBridge.readEvents(this, dayStart - LOOKBACK_MS, now).map {
+            ForegroundRun.Event(
+                t = it["t"] as Long,
+                pkg = it["p"] as String,
+                cls = it["c"] as String?,
+                kind = it["k"] as String,
+            )
+        }
+        if (launchable.isEmpty() || now - launchableAtMs > LAUNCHABLE_REFRESH_MS) {
+            val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            launchable = UsageBridge.resolve(this, launcher)
+                .mapNotNull { it.activityInfo?.packageName }
+                .toSet()
+            launchableAtMs = now
+        }
+        val idle = HashSet<String>(UsageBridge.homePackages(this))
+        idle.add(packageName)
+        idle.add(SYSTEM_UI)
+        return DayUsage.count(
+            events = events,
+            dayStartMs = dayStart,
+            nowMs = now,
+            idle = idle,
+            launchable = launchable,
+            categoryOf = { p ->
+                categories.getOrPut(p) {
+                    UsageEventMapper.categoryName(appInfo(p)?.category ?: ApplicationInfo.CATEGORY_UNDEFINED)
+                }
+            },
+            offApps = snap.offApps,
+            onApps = snap.onApps,
+            guessOff = snap.guessOffCategories,
+        )
     }
 
     private fun tickOnce() {

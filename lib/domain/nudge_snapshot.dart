@@ -57,6 +57,10 @@ class NudgeSnapshot {
     this.guessOffCategories = guess.guessOffCategories,
     this.colors = const {},
     this.lock = false,
+    this.status = false,
+    this.reminders = false,
+    this.offApps = const {},
+    this.onApps = const {},
   });
 
   final int writtenAtMs;
@@ -76,6 +80,19 @@ class NudgeSnapshot {
   /// read as false when absent, so older and newer builds agree.
   final bool lock;
 
+  /// "Today in notifications": the block now and today's distracting time.
+  final bool status;
+
+  /// "Block reminders": heads-ups 5 minutes before and at each block start.
+  final bool reminders;
+
+  /// Packages with an off-track rule for any block: always distracting.
+  final Set<String> offApps;
+
+  /// Packages with an on-track rule and no off-track rule: never
+  /// distracting, whatever their category guesses.
+  final Set<String> onApps;
+
   /// A snapshot this old is ignored: the plan in it may no longer be the
   /// plan, and a wrong nudge is worse than none.
   static const maxAge = Duration(hours: 36);
@@ -92,6 +109,10 @@ class NudgeSnapshot {
     'windows': [for (final w in windows) w.toJson()],
     'colors': colors,
     'lock': lock,
+    'status': status,
+    'reminders': reminders,
+    'offApps': offApps.toList()..sort(),
+    'onApps': onApps.toList()..sort(),
   };
 
   factory NudgeSnapshot.fromJson(Map<String, dynamic> j) => NudgeSnapshot(
@@ -114,7 +135,24 @@ class NudgeSnapshot {
         e.key: e.value as String,
     },
     lock: j['lock'] as bool? ?? false,
+    status: j['status'] as bool? ?? false,
+    reminders: j['reminders'] as bool? ?? false,
+    offApps: {for (final p in j['offApps'] as List<dynamic>? ?? const []) p as String},
+    onApps: {for (final p in j['onApps'] as List<dynamic>? ?? const []) p as String},
   );
+}
+
+/// The apps the distracting-time count treats specially, from the learned
+/// rules: (always distracting, never distracting). An off-track rule for
+/// any block wins over an on-track rule for another.
+(Set<String>, Set<String>) distractingRuleSets(Map<(String, String), Verdict> rules) {
+  final off = <String>{};
+  final on = <String>{};
+  for (final MapEntry(key: (_, p), :value) in rules.entries) {
+    if (value == Verdict.offTrack) off.add(p);
+    if (value == Verdict.onTrack) on.add(p);
+  }
+  return (off, on.difference(off));
 }
 
 /// What [decideNudge] concluded.

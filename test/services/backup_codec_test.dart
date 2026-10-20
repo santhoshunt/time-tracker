@@ -28,6 +28,8 @@ const _settings = <String, Object>{
   'summary_minute_v1': 1200,
   'focus_lock_v1': true,
   'weekly_target_v1': 70,
+  'today_notifications_v1': false,
+  'block_reminders_v1': false,
 };
 
 /// Fills every backed-up table with at least one row.
@@ -170,6 +172,8 @@ void main() {
       expect(settings.skippedSetup, {'overlay', 'notifications'});
       expect(settings.focusLock, isTrue);
       expect(settings.weeklyTarget, 70);
+      expect(settings.todayNotifications, isFalse);
+      expect(settings.blockReminders, isFalse);
       expect(bumps, greaterThan(0));
     });
 

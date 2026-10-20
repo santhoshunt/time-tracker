@@ -153,10 +153,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(find.text('Melting clock'), 200);
       expect(find.text('Mono'), findsOneWidget);
+      expect(find.text('Melting clock'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('v0.1.0'), 200);
       expect(find.text('v0.1.0'), findsOneWidget);
-      expect(find.text('Melting clock'), findsOneWidget);
     });
 
     testWidgets('the theme picker changes the theme', (tester) async {

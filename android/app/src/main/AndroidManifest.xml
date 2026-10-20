@@ -24,6 +24,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Block reminders (TodayNotifications.kt) 5 minutes before and at the
+         start of each planned block, on time while the phone sleeps. Drift
+         is a day planner, which is what USE_EXACT_ALARM is for (granted at
+         install from Android 13); Android 12 needs SCHEDULE_EXACT_ALARM. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32"/>
     <application
         android:label="Drift"
         android:name="${applicationName}"
@@ -171,6 +179,10 @@
         <!-- The nudge notification's "5 more minutes"; explicit intents only. -->
         <receiver
             android:name=".NudgeActionReceiver"
+            android:exported="false"/>
+        <!-- Block reminder alarms; explicit intents only. -->
+        <receiver
+            android:name=".BlockAlarmReceiver"
             android:exported="false"/>
         <!-- Home-screen widgets (DriftWidgets.kt). Exported so the launcher's
              AppWidget host reaches them; they only redraw from the app's own

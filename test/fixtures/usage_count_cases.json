@@ -1,0 +1,283 @@
+{
+  "about": "Shared by test/domain/day_usage_test.dart and DayUsageTest.kt, so the Today notification's numbers (counted on the phone) match the Dart sessionizer behind the Usage tab. Times are local, parsed in the test machine's zone on both sides. Every case lists all its inputs; nothing is inherited.",
+  "cases": [
+    {
+      "name": "one app, not distracting",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T10:20:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 1200000, "distractingMs": 0}
+    },
+    {
+      "name": "an in-app switch reported pause-first stays one session",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T10:05:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"},
+        {"t": "2026-10-20T10:05:00.200", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "resumed"},
+        {"t": "2026-10-20T10:05:00.900", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "stopped"},
+        {"t": "2026-10-20T10:20:00", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "paused"},
+        {"t": "2026-10-20T10:20:01", "p": "com.example.notes", "c": "com.example.notes.Editor", "k": "stopped"}
+      ],
+      "expect": {"totalMs": 1200000, "distractingMs": 0}
+    },
+    {
+      "name": "launcher, System UI and Drift time is left out",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T08:00:00", "p": "com.example.launcher", "c": "com.example.launcher.Home", "k": "resumed"},
+        {"t": "2026-10-20T08:01:00", "p": "com.example.launcher", "c": "com.example.launcher.Home", "k": "paused"},
+        {"t": "2026-10-20T08:01:00.300", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T08:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"},
+        {"t": "2026-10-20T08:10:00.300", "p": "com.android.systemui", "c": "com.android.systemui.Recents", "k": "resumed"},
+        {"t": "2026-10-20T08:11:00", "p": "com.android.systemui", "c": "com.android.systemui.Recents", "k": "paused"},
+        {"t": "2026-10-20T08:11:00.300", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "resumed"},
+        {"t": "2026-10-20T08:15:00", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "paused"}
+      ],
+      "expect": {"totalMs": 539700, "distractingMs": 539700}
+    },
+    {
+      "name": "Drift is left out even when it is not in the idle list",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher"],
+      "launchable": [],
+      "categories": {},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T08:00:00", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "resumed"},
+        {"t": "2026-10-20T08:15:00", "p": "io.github.santhoshunt.drift", "c": "io.github.santhoshunt.drift.MainActivity", "k": "paused"}
+      ],
+      "expect": {"totalMs": 0, "distractingMs": 0}
+    },
+    {
+      "name": "a session across midnight counts from midnight",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-19T23:50:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T00:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 600000, "distractingMs": 600000}
+    },
+    {
+      "name": "yesterday's use alone counts nothing",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-19T22:00:00", "p": "com.example.social", "c": "com.example.social.Feed", "k": "resumed"},
+        {"t": "2026-10-19T22:30:00", "p": "com.example.social", "c": "com.example.social.Feed", "k": "paused"}
+      ],
+      "expect": {"totalMs": 0, "distractingMs": 0}
+    },
+    {
+      "name": "the app in front counts up to now",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:30:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T13:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"}
+      ],
+      "expect": {"totalMs": 1800000, "distractingMs": 0}
+    },
+    {
+      "name": "screen off closes the app",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.social", "c": "com.example.social.Feed", "k": "resumed"},
+        {"t": "2026-10-20T09:12:00", "p": "android", "c": null, "k": "screenOff"}
+      ],
+      "expect": {"totalMs": 720000, "distractingMs": 720000}
+    },
+    {
+      "name": "the lock screen closes the app",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.game", "c": "com.example.game.Play", "k": "resumed"},
+        {"t": "2026-10-20T09:05:00", "p": "android", "c": null, "k": "keyguardShown"}
+      ],
+      "expect": {"totalMs": 300000, "distractingMs": 300000}
+    },
+    {
+      "name": "a startup with no shutdown closes everything at the last event",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:20:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T11:00:00", "p": "android", "c": null, "k": "startup"}
+      ],
+      "expect": {"totalMs": 1200000, "distractingMs": 0}
+    },
+    {
+      "name": "a system component without a home-screen icon is left out",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.playservices", "c": "com.example.playservices.SignIn", "k": "resumed"},
+        {"t": "2026-10-20T09:30:00", "p": "com.example.playservices", "c": "com.example.playservices.SignIn", "k": "paused"},
+        {"t": "2026-10-20T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T10:10:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 600000, "distractingMs": 0}
+    },
+    {
+      "name": "an empty app list keeps everything, and an unknown app is Other",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": [],
+      "categories": {"com.example.notes": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.playservices", "c": "com.example.playservices.SignIn", "k": "resumed"},
+        {"t": "2026-10-20T09:30:00", "p": "com.example.playservices", "c": "com.example.playservices.SignIn", "k": "paused"},
+        {"t": "2026-10-20T10:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T10:10:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 2400000, "distractingMs": 0}
+    },
+    {
+      "name": "an on-track rule beats a social category",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": ["com.example.chat"], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:15:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 900000, "distractingMs": 0}
+    },
+    {
+      "name": "an off-track rule makes a productivity app distracting",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": ["com.example.tool"], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.tool", "c": "com.example.tool.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:25:00", "p": "com.example.tool", "c": "com.example.tool.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 1500000, "distractingMs": 1500000}
+    },
+    {
+      "name": "an off-track rule wins over an on-track one",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": ["com.example.chat"], "onApps": ["com.example.chat"], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:15:00", "p": "com.example.chat", "c": "com.example.chat.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 900000, "distractingMs": 900000}
+    },
+    {
+      "name": "duplicate events count once",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:10:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"},
+        {"t": "2026-10-20T09:10:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 600000, "distractingMs": 0}
+    },
+    {
+      "name": "the same app back after 6 seconds is a second run, both counted",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"},
+        {"t": "2026-10-20T09:10:06", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:20:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 1194000, "distractingMs": 1194000}
+    },
+    {
+      "name": "the same app back within 5 seconds is one run",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:10:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"},
+        {"t": "2026-10-20T09:10:03", "p": "com.example.video", "c": "com.example.video.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:20:00", "p": "com.example.video", "c": "com.example.video.Main", "k": "paused"}
+      ],
+      "expect": {"totalMs": 1200000, "distractingMs": 1200000}
+    },
+    {
+      "name": "another app resuming closes the first",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes", "com.example.video", "com.example.social", "com.example.chat", "com.example.game", "com.example.tool"],
+      "categories": {"com.example.notes": "productivity", "com.example.video": "video", "com.example.social": "social", "com.example.chat": "social", "com.example.game": "game", "com.example.tool": "productivity"},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [
+        {"t": "2026-10-20T09:00:00", "p": "com.example.notes", "c": "com.example.notes.Main", "k": "resumed"},
+        {"t": "2026-10-20T09:30:00", "p": "com.example.social", "c": "com.example.social.Feed", "k": "resumed"},
+        {"t": "2026-10-20T09:40:00", "p": "com.example.social", "c": "com.example.social.Feed", "k": "paused"}
+      ],
+      "expect": {"totalMs": 2400000, "distractingMs": 600000}
+    },
+    {
+      "name": "no events, nothing counted",
+      "dayStart": "2026-10-20T00:00:00", "now": "2026-10-20T13:00:00",
+      "idle": ["com.example.launcher", "com.android.systemui", "io.github.santhoshunt.drift"],
+      "launchable": ["com.example.notes"],
+      "categories": {},
+      "offApps": [], "onApps": [], "guessOff": ["game", "video", "social", "news"],
+      "events": [],
+      "expect": {"totalMs": 0, "distractingMs": 0}
+    }
+  ]
+}

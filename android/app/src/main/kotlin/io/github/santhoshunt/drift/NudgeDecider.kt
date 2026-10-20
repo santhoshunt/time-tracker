@@ -25,6 +25,8 @@ data class NudgeColors(
     val textSecondary: Int = 0xFFAAB8D4.toInt(),
     val accent: Int = 0xFF8AB4F8.toInt(),
     val onAccent: Int = 0xFF0B1A33.toInt(),
+    /** The distracting-time bar in the Today notification. */
+    val offTrack: Int = 0xFFFF6B6B.toInt(),
 ) {
     companion object {
         private val HEX = Regex("^#[0-9A-Fa-f]{6}$")
@@ -44,6 +46,7 @@ data class NudgeColors(
                 textSecondary = color("textSecondary", d.textSecondary),
                 accent = color("accent", d.accent),
                 onAccent = color("onAccent", d.onAccent),
+                offTrack = color("offTrack", d.offTrack),
             )
         }
     }
@@ -71,6 +74,14 @@ data class NudgeSnapshot(
     /** Focus lock: an app ruled off for the block locks at once. Optional
      * in the file, false when absent, so `v` stays 1. */
     val lock: Boolean = false,
+    /** "Today in notifications": the block and distracting-time pair. */
+    val status: Boolean = false,
+    /** "Block reminders": heads-ups before and at each block start. */
+    val reminders: Boolean = false,
+    /** Packages ruled off track for some block: always distracting. */
+    val offApps: Set<String> = emptySet(),
+    /** Packages ruled on track and never off: never distracting. */
+    val onApps: Set<String> = emptySet(),
 ) {
     companion object {
         /** The snapshot, or null when anything required is missing or of
@@ -104,6 +115,12 @@ data class NudgeSnapshot(
                 windows = windows,
                 colors = NudgeColors.parse(json.opt("colors") as? JSONObject),
                 lock = json.opt("lock") as? Boolean ?: false,
+                // The v0.6 fields are optional: absent or the wrong type
+                // reads as off, so a bad value never stops nudges.
+                status = json.opt("status") as? Boolean ?: false,
+                reminders = json.opt("reminders") as? Boolean ?: false,
+                offApps = json.strings("offApps") ?: emptySet(),
+                onApps = json.strings("onApps") ?: emptySet(),
             )
         }
 

@@ -115,6 +115,38 @@ void main() {
       expect(snapshot.toJson()['lock'], isTrue);
     });
 
+    testWidgets('the notification switches save and reach the snapshot', (tester) async {
+      await pumpSettings(tester);
+      expect(find.text('Nudges and notifications'), findsOneWidget);
+      for (final row in ['Today in notifications', 'Block reminders']) {
+        await tester.scrollUntilVisible(find.text(row), 200);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text(row));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(row));
+        await tester.pumpAndSettle();
+      }
+      expect(settings.todayNotifications, isFalse);
+      expect(settings.blockReminders, isFalse);
+      final again = SettingsProvider();
+      await again.load();
+      expect(again.todayNotifications, isFalse);
+      expect(again.blockReminders, isFalse);
+      final snapshot = await tester.runAsync(
+        () => buildNudgeSnapshot(s, settings, DriftColors.of(ThemeId.mono)),
+      );
+      expect(snapshot!.status, isFalse);
+      expect(snapshot.reminders, isFalse);
+    });
+
+    test('both notification switches are on for a new install', () async {
+      SharedPreferences.setMockInitialValues({});
+      final p = SettingsProvider();
+      await p.load();
+      expect(p.todayNotifications, isTrue);
+      expect(p.blockReminders, isTrue);
+    });
+
     testWidgets('the lock row hides with live nudges off', (tester) async {
       await settings.setNudgesEnabled(false);
       await pumpSettings(tester);

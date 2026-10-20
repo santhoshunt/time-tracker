@@ -234,7 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
             SettingsGroup(
-              title: 'Nudges',
+              title: 'Nudges and notifications',
               children: [
                 SettingsRow(
                   title: 'Live nudges',
@@ -305,6 +305,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: Switch(
                     value: settings.summaryEnabled,
                     onChanged: settings.setSummaryEnabled,
+                  ),
+                ),
+                SettingsRow(
+                  title: 'Today in notifications',
+                  subtitle:
+                      'Your current block, and distracting time against all '
+                      'app time',
+                  onTap: () => settings.setTodayNotifications(
+                    !settings.todayNotifications,
+                  ),
+                  trailing: Switch(
+                    value: settings.todayNotifications,
+                    onChanged: settings.setTodayNotifications,
+                  ),
+                ),
+                SettingsRow(
+                  title: 'Block reminders',
+                  subtitle: '5 minutes before a block, and when it starts',
+                  onTap: () =>
+                      settings.setBlockReminders(!settings.blockReminders),
+                  trailing: Switch(
+                    value: settings.blockReminders,
+                    onChanged: settings.setBlockReminders,
                   ),
                 ),
                 SettingsRow(

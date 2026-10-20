@@ -89,12 +89,49 @@ void main() {
       expect(nudges.stops, 0);
     });
 
-    test('sync stops the service when nudges are switched off', () async {
+    test('with nudges off the service keeps running for the Today notifications', () async {
       await settings.setNudgesEnabled(false);
       await syncNudges(s, settings, DriftColors.of(ThemeId.mono), directory: () async => dir);
-      expect(nudges.stops, 1);
+      expect(nudges.starts, 1);
+      expect(nudges.stops, 0);
       final json = jsonDecode(File('${dir.path}/$nudgeSnapshotFile').readAsStringSync());
       expect(json['enabled'], isFalse);
+      expect(json['status'], isTrue);
+      expect(json['reminders'], isTrue);
+    });
+
+    test('reminders alone keep the service running', () async {
+      await settings.setNudgesEnabled(false);
+      await settings.setTodayNotifications(false);
+      await syncNudges(s, settings, DriftColors.of(ThemeId.mono), directory: () async => dir);
+      expect(nudges.starts, 1);
+      final json = jsonDecode(File('${dir.path}/$nudgeSnapshotFile').readAsStringSync());
+      expect(json['status'], isFalse);
+      expect(json['reminders'], isTrue);
+    });
+
+    test('sync stops the service once nudges, notifications and reminders are all off', () async {
+      await settings.setNudgesEnabled(false);
+      await settings.setTodayNotifications(false);
+      await settings.setBlockReminders(false);
+      await syncNudges(s, settings, DriftColors.of(ThemeId.mono), directory: () async => dir);
+      expect(nudges.stops, 1);
+      expect(nudges.starts, 0);
+    });
+
+    test('the snapshot carries the distracting rule sets and the bar colour', () async {
+      await seedSampleDay(s, testNow);
+      final snap = await buildNudgeSnapshot(s, settings, DriftColors.of(ThemeId.mono));
+      // The sample rules: Notes and Zoom on track, YouTube and Instagram off.
+      expect(snap.offApps, {'com.example.video', 'com.example.social'});
+      expect(snap.onApps, {'com.example.notes', 'com.example.meet'});
+      expect(snap.colors['offTrack'], '#FF6B6B');
+      final again = NudgeSnapshot.fromJson(
+        jsonDecode(jsonEncode(snap.toJson())) as Map<String, dynamic>,
+      );
+      expect(again.offApps, snap.offApps);
+      expect(again.onApps, snap.onApps);
+      expect(again.status, isTrue);
     });
 
     test('sync stops the service without usage access', () async {
