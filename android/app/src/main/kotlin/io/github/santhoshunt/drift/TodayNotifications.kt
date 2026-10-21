@@ -86,15 +86,26 @@ object TodayNotifications {
         )
     }
 
-    /** "Distracting: 39 min" over "of 1 h 25 min on apps", with the
-     * distracting share as a bar in the off-track colour. */
-    fun usage(context: Context, totalMs: Long, distractingMs: Long, colors: NudgeColors): Notification {
-        val line = TodayStatus.usageLine(totalMs, distractingMs)
-        return NotificationCompat.Builder(context, TODAY_CHANNEL)
+    /** "Distracting: 39 min" over "46% of 1 h 25 min on apps". Expanded,
+     * it also lists the apps with the most distracting time. */
+    fun usage(
+        context: Context,
+        counted: DayUsage.Counted,
+        label: (String) -> String,
+        colors: NudgeColors,
+    ): Notification {
+        val line = TodayStatus.usageLine(counted.totalMs, counted.distractingMs)
+        val apps = TodayStatus.topApps(counted.distractingByApp, label)
+        val builder = NotificationCompat.Builder(context, TODAY_CHANNEL)
+        if (apps.isNotEmpty()) {
+            builder.setStyle(
+                NotificationCompat.BigTextStyle().bigText((listOf(line.text) + apps).joinToString("\n"))
+            )
+        }
+        return builder
             .setSmallIcon(R.drawable.ic_stat_drift)
             .setContentTitle(line.title)
             .setContentText(line.text)
-            .setProgress(100, TodayStatus.percent(totalMs, distractingMs), false)
             .setColor(colors.offTrack)
             .setContentIntent(tap(context, TAB_USAGE, TAP_USAGE_REQUEST))
             .setOngoing(true)

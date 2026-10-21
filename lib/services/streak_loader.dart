@@ -2,7 +2,7 @@ import '../app_services.dart';
 import 'period_loader.dart';
 import 'review_summary.dart';
 
-/// This week so far and the run of good days: Today's week card.
+/// This week so far and the run of good days: Today's week row.
 class WeekProgress {
   const WeekProgress({
     required this.week,

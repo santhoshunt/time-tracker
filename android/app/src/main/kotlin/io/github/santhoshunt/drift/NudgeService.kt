@@ -139,6 +139,7 @@ class NudgeService : Service() {
     private var launchable: Set<String> = emptySet()
     private var launchableAtMs = 0L
     private val categories = HashMap<String, String>()
+    private val labels = HashMap<String, String>()
 
     private val tick = object : Runnable {
         override fun run() {
@@ -238,7 +239,7 @@ class NudgeService : Service() {
             }
             if (!shownUsage || now - lastCountMs >= COUNT_EVERY_MS) {
                 val counted = countToday(now, snap)
-                val usage = TodayNotifications.usage(this, counted.totalMs, counted.distractingMs, snap.colors)
+                val usage = TodayNotifications.usage(this, counted, ::label, snap.colors)
                 nm.notify(SERVICE_NOTIFICATION_ID, usage)
                 lastUsage = usage
                 lastCountMs = now
@@ -424,6 +425,11 @@ class NudgeService : Service() {
     } catch (_: PackageManager.NameNotFoundException) {
         null
     }
+
+    /** The app's name as the launcher shows it, or the package name when
+     * the app is gone. Tick-thread only, like [categories]. */
+    private fun label(pkg: String): String =
+        labels.getOrPut(pkg) { appInfo(pkg)?.loadLabel(packageManager)?.toString() ?: pkg }
 
     private fun createChannels() {
         val nm = getSystemService(NotificationManager::class.java) ?: return

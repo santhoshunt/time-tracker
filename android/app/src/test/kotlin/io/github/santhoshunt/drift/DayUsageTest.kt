@@ -64,8 +64,12 @@ class DayUsageTest {
                 guessOff = c.getJSONArray("guessOff").strings(),
             )
             val e = c.getJSONObject("expect")
-            val expected = DayUsage.Counted(e.getLong("totalMs"), e.getLong("distractingMs"))
-            if (counted != expected) failures.add("${c.getString("name")}: expected $expected, got $counted")
+            val expected = e.getLong("totalMs") to e.getLong("distractingMs")
+            val got = counted.totalMs to counted.distractingMs
+            if (got != expected) failures.add("${c.getString("name")}: expected $expected, got $got")
+            if (counted.distractingByApp.values.sum() != counted.distractingMs) {
+                failures.add("${c.getString("name")}: the per-app split does not add up to $got")
+            }
         }
         println("DayUsageTest: asserted ${cases.length()} fixture cases")
         assertTrue(failures.joinToString("\n"), failures.isEmpty())

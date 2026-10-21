@@ -75,11 +75,32 @@ class TodayStatusTest {
         assertEquals("2 h", TodayStatus.minutes(120))
         assertEquals("1 h 25 min", TodayStatus.minutes(85))
         assertEquals(
-            TodayStatus.Line("Distracting: 39 min", "of 1 h 25 min on apps"),
+            TodayStatus.Line("Distracting: 39 min", "46% of 1 h 25 min on apps"),
             TodayStatus.usageLine(85L * 60_000, 39L * 60_000 + 20_000),
+        )
+        assertEquals(
+            TodayStatus.Line("Distracting: 0 min", "of 0 min on apps"),
+            TodayStatus.usageLine(20_000, 20_000),
         )
         assertEquals(46, TodayStatus.percent(85L * 60_000, 39L * 60_000))
         assertEquals(0, TodayStatus.percent(0, 0))
+    }
+
+    @Test
+    fun topAppsMostFirstWithTheirNames() {
+        val names = mapOf("com.example.video" to "YouTube", "com.example.social" to "Instagram")
+        val byApp = mapOf(
+            "com.example.social" to 32L * 60_000,
+            "com.example.video" to 100L * 60_000,
+            "com.example.news" to 5L * 60_000,
+            "com.example.game" to 5L * 60_000,
+            "com.example.quick" to 20_000L,
+        )
+        assertEquals(
+            listOf("YouTube 1 h 40 min", "Instagram 32 min", "com.example.game 5 min"),
+            TodayStatus.topApps(byApp, { names[it] ?: it }),
+        )
+        assertEquals(emptyList<String>(), TodayStatus.topApps(mapOf("com.example.quick" to 20_000L), { it }))
     }
 
     @Test

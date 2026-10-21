@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../domain/models.dart';
 import '../theme/drift_theme.dart';
 
-/// Today before the first block starts (option C, a slim strip): one line
+/// Today before the first block starts, the top of DayCard: one line
 /// saying when the day begins, so a planned morning never reads as
 /// "Nothing planned yet" and the lanes keep their room.
 class DayStartStrip extends StatelessWidget {
@@ -18,28 +18,19 @@ class DayStartStrip extends StatelessWidget {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
     final at = DateFormat('HH:mm').format(first.start);
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: c.line),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        child: Row(
-          children: [
-            Icon(Icons.schedule, size: 18, color: c.accent),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Your day starts at $at with ${first.name}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: text.bodyMedium?.copyWith(color: c.text),
-              ),
-            ),
-          ],
+    return Row(
+      children: [
+        Icon(Icons.schedule, size: 18, color: c.accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Your day starts at $at with ${first.name}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: text.bodyMedium?.copyWith(color: c.text),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

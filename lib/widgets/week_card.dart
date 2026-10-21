@@ -9,11 +9,11 @@ import '../theme/drift_theme.dart';
 String streakLabel(int days) =>
     days <= 0 ? 'No streak yet' : '$days-day streak';
 
-/// Today's "This week" card (streak option B, target option A): one dot
-/// per day coloured by its score, the run of good days, and the week's
-/// score against the weekly target when one is set.
-class WeekCard extends StatelessWidget {
-  const WeekCard({
+/// The week as one row at the bottom of Today's DayCard: one dot per day
+/// coloured by its score, then the week's score against the weekly target
+/// (when one is set) over the run of good days.
+class WeekRow extends StatelessWidget {
+  const WeekRow({
     super.key,
     required this.progress,
     required this.target,
@@ -32,60 +32,54 @@ class WeekCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final small = text.labelSmall?.copyWith(color: c.textSecondary);
     final percent = progress.weekPercent;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text('This week', style: text.titleSmall)),
-                Text(
-                  streakLabel(progress.streak),
-                  style: text.bodySmall?.copyWith(color: c.textSecondary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                for (final p in progress.week)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _Dot(point: p, today: today),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat('EEEEE').format(p.day),
-                          maxLines: 1,
-                          style: small?.copyWith(
-                            color: p.day == today ? c.text : c.textSecondary,
-                          ),
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: Row(
+            children: [
+              for (final p in progress.week)
+                Expanded(
+                  child: Column(
+                    children: [
+                      _Dot(point: p, today: today),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('EEEEE').format(p.day),
+                        maxLines: 1,
+                        style: small?.copyWith(
+                          color: p.day == today ? c.text : c.textSecondary,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-              ],
-            ),
-            // One line, the bar beside its words, so the card leaves the
-            // lanes below as much room as it can.
-            if (target > 0 && percent != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: _TargetBar(percent: percent, target: target)),
-                  const SizedBox(width: 12),
-                  Text(
-                    '$percent% of $target% target',
-                    style: text.bodySmall?.copyWith(color: c.text),
-                  ),
-                ],
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        // A fixed share, so large text wraps instead of pushing the dots
+        // off, and the words sit against the card's right edge.
+        Expanded(
+          flex: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (target > 0 && percent != null)
+                Text(
+                  '$percent% of $target% target',
+                  textAlign: TextAlign.end,
+                  style: text.bodySmall?.copyWith(color: c.text),
+                ),
+              Text(
+                streakLabel(progress.streak),
+                textAlign: TextAlign.end,
+                style: text.bodySmall?.copyWith(color: c.textSecondary),
               ),
             ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -123,70 +117,6 @@ class _Dot extends StatelessWidget {
           color: isToday && point.percent == null ? null : fill,
           border: isToday ? Border.all(color: c.accent, width: 2) : null,
         ),
-      ),
-    );
-  }
-}
-
-/// The week's score as a bar with a tick at the target: on-track once the
-/// target is met, the guessed colour while short of it.
-class _TargetBar extends StatelessWidget {
-  const _TargetBar({required this.percent, required this.target});
-
-  final int percent;
-  final int target;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.drift;
-    final met = percent >= target;
-    return Semantics(
-      label: met
-          ? 'Weekly target met: $percent% of $target%'
-          : 'Weekly target: $percent% of $target%',
-      excludeSemantics: true,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final w = box.maxWidth;
-          return SizedBox(
-            height: 14,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 3,
-                  height: 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: c.line,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  width: w * percent.clamp(0, 100) / 100,
-                  top: 3,
-                  height: 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: met ? c.onTrack : c.guessed,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: (w * target / 100 - 1).clamp(0.0, w - 2),
-                  width: 2,
-                  top: 0,
-                  bottom: 0,
-                  child: ColoredBox(color: c.text),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }

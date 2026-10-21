@@ -94,16 +94,30 @@ object TodayStatus {
         )
     }
 
-    /** The usage notification: "Distracting: 39 min" over "of 1 h 25 min
-     * on apps". */
-    fun usageLine(totalMs: Long, distractingMs: Long): Line = Line(
-        "Distracting: ${minutes(roundedMinutes(distractingMs))}",
-        "of ${minutes(roundedMinutes(totalMs))} on apps",
-    )
+    /** The usage notification: "Distracting: 39 min" over "46% of 1 h 25
+     * min on apps". The share is left out while the total reads "0 min". */
+    fun usageLine(totalMs: Long, distractingMs: Long): Line {
+        val total = roundedMinutes(totalMs)
+        val share = if (total == 0L) "" else "${percent(totalMs, distractingMs)}% "
+        return Line(
+            "Distracting: ${minutes(roundedMinutes(distractingMs))}",
+            "${share}of ${minutes(total)} on apps",
+        )
+    }
 
-    /** The bar's fill, 0 to 100. */
+    /** The distracting share of app time, 0 to 100. */
     fun percent(totalMs: Long, distractingMs: Long): Int =
         if (totalMs <= 0) 0 else ((100.0 * distractingMs / totalMs).roundToLong()).toInt().coerceIn(0, 100)
+
+    /** The expanded notification's lines: "YouTube 1 h 40 min" for the
+     * [limit] apps with the most distracting time, most first. Apps under
+     * half a minute read "0 min" and are left out. */
+    fun topApps(byApp: Map<String, Long>, label: (String) -> String, limit: Int = 3): List<String> =
+        byApp.entries
+            .filter { roundedMinutes(it.value) > 0 }
+            .sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
+            .take(limit)
+            .map { "${label(it.key)} ${minutes(roundedMinutes(it.value))}" }
 
     /** Two heads-ups per block, in time order. Keys hold the start and the
      * name, so two blocks starting together each get theirs. */

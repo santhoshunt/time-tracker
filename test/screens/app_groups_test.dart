@@ -233,14 +233,16 @@ void main() {
       expect(find.text('Your day starts at 15:00 with Reading'), findsOneWidget);
       expect(find.text('Nothing planned yet'), findsNothing);
       // Full width, like the lanes under it.
-      expect(tester.getSize(find.byType(DayStartStrip)).width, greaterThan(350));
+      expect(find.byType(DayStartStrip), findsOneWidget);
+      expect(tester.getSize(find.byType(DayCard)).width, greaterThan(350));
     });
 
     testWidgets('a day with no blocks still invites planning, full width', (tester) async {
       await today(tester);
       expect(find.text('Nothing planned yet'), findsOneWidget);
       expect(find.byType(DayStartStrip), findsNothing);
-      expect(tester.getSize(find.byType(ScoreCard)).width, greaterThan(350));
+      expect(find.byType(ScoreSummary), findsOneWidget);
+      expect(tester.getSize(find.byType(DayCard)).width, greaterThan(350));
     });
 
     testWidgets('once a block has started the score shows', (tester) async {

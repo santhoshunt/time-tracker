@@ -8,6 +8,7 @@ import 'package:drift_time/services/day_loader.dart';
 import 'package:drift_time/services/nudge_sync.dart';
 import 'package:drift_time/theme/drift_theme.dart';
 import 'package:drift_time/theme/theme_id.dart';
+import 'package:drift_time/widgets/score_card.dart';
 import 'package:drift_time/widgets/week_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,30 +44,46 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  group('Today week card', () {
-    testWidgets('shows the week, the streak and the target', (tester) async {
+  group('Today week row', () {
+    testWidgets('shows the week, the streak and the target in the day card', (tester) async {
       await seedSampleDay(s, testNow);
       final percent = (await tester.runAsync(() => loadDay(s, testNow)))!.score!.percent;
       await pumpToday(tester);
-      expect(find.byType(WeekCard), findsOneWidget);
-      expect(find.text('This week'), findsOneWidget);
+      expect(find.byType(DayCard), findsOneWidget);
+      expect(find.descendant(of: find.byType(DayCard), matching: find.byType(WeekRow)), findsOneWidget);
+      expect(find.text('On track'), findsOneWidget);
       // Only today has data: a streak of one at 75% or more, none below.
       expect(find.text(percent >= 75 ? '1-day streak' : 'No streak yet'), findsOneWidget);
       // The week's score is today's, the only day with a score.
       expect(find.text('$percent% of 80% target'), findsOneWidget);
     });
 
-    testWidgets('a target of Off hides the target row', (tester) async {
+    testWidgets('a target of Off leaves only the streak', (tester) async {
       await seedSampleDay(s, testNow);
       await settings.setWeeklyTarget(0);
       await pumpToday(tester);
-      expect(find.byType(WeekCard), findsOneWidget);
+      expect(find.byType(WeekRow), findsOneWidget);
       expect(find.textContaining('target'), findsNothing);
     });
 
-    testWidgets('a week with no plan has no card', (tester) async {
+    testWidgets('a week with no plan has no week row and no line', (tester) async {
       await pumpToday(tester);
-      expect(find.byType(WeekCard), findsNothing);
+      expect(find.byType(DayCard), findsOneWidget);
+      expect(find.byType(WeekRow), findsNothing);
+      expect(find.descendant(of: find.byType(DayCard), matching: find.byType(Divider)), findsNothing);
+    });
+
+    testWidgets('the scored card fits a small phone with large text', (tester) async {
+      await seedSampleDay(s, testNow);
+      tester.view.devicePixelRatio = 2;
+      tester.view.physicalSize = const Size(320, 640) * 2;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(withApp(s, settings, const Scaffold(body: TodayScreen())));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(WeekRow), findsOneWidget);
     });
 
     test('streak words', () {

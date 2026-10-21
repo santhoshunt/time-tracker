@@ -47,7 +47,7 @@ void main() {
       Scaffold(
         body: Padding(
           padding: const EdgeInsets.all(16),
-          child: ScoreCard(score: null, onPlan: () {}),
+          child: DayCard(top: ScoreSummary(score: null, onPlan: () {})),
         ),
       ),
       size: const Size(320, 260),

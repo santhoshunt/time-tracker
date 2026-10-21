@@ -11,10 +11,11 @@ String formatMinutes(int minutes) {
   return m == 0 ? '$h h' : '$h h $m min';
 }
 
-/// The day's verdict in one card: the on-track share, how much drifted
-/// and how much was planned. With nothing planned it invites planning.
-class ScoreCard extends StatelessWidget {
-  const ScoreCard({super.key, required this.score, this.onPlan});
+/// The day's verdict, the top of [DayCard]: the on-track share, how much
+/// drifted and how much was planned. With nothing planned it invites
+/// planning.
+class ScoreSummary extends StatelessWidget {
+  const ScoreSummary({super.key, required this.score, this.onPlan});
 
   final DayScore? score;
 
@@ -26,78 +27,70 @@ class ScoreCard extends StatelessWidget {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
     final s = score;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        // Option A: the button sits under the text, so long text never runs
-        // into it on a narrow phone.
-        child: s == null
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nothing planned yet', style: text.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Lay out your day to see where it drifts.',
-                    style: text.bodySmall?.copyWith(color: c.textSecondary),
-                  ),
-                  if (onPlan != null) ...[
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      onPressed: onPlan,
-                      child: const Text('Plan today'),
-                    ),
-                  ],
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'On track',
-                        style: text.bodySmall?.copyWith(color: c.textSecondary),
-                      ),
-                      Text(
-                        '${s.percent}%',
-                        style: text.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  // Flexible so large text wraps instead of overflowing on
-                  // narrow phones.
-                  Expanded(
-                    child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _Pill(
-                        text: s.offMin == 0
-                            ? 'No drift'
-                            : '${formatMinutes(s.offMin)} drift',
-                        color: s.offMin == 0 ? c.onTrack : c.offTrack,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'of ${formatMinutes(s.plannedMin)} planned so far',
-                        textAlign: TextAlign.end,
-                        style: text.bodySmall?.copyWith(color: c.textSecondary),
-                      ),
-                    ],
-                  ),
-                  ),
-                ],
+    if (s == null) {
+      // The button sits beside the text while both fit and drops under it
+      // on a narrow phone or with large text, so neither squeezes the other.
+      return Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Text('Nothing planned yet', style: text.titleMedium),
+          if (onPlan != null)
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                visualDensity: VisualDensity.compact,
               ),
-      ),
+              onPressed: onPlan,
+              child: const Text('Plan today'),
+            ),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'On track',
+              style: text.bodySmall?.copyWith(color: c.textSecondary),
+            ),
+            Text(
+              '${s.percent}%',
+              style: text.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        // Flexible so large text wraps instead of overflowing on
+        // narrow phones.
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _Pill(
+                text: s.offMin == 0
+                    ? 'No drift'
+                    : '${formatMinutes(s.offMin)} drift',
+                color: s.offMin == 0 ? c.onTrack : c.offTrack,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'of ${formatMinutes(s.plannedMin)} planned so far',
+                textAlign: TextAlign.end,
+                style: text.bodySmall?.copyWith(color: c.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -122,4 +115,40 @@ class _Pill extends StatelessWidget {
       style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
     ),
   );
+}
+
+/// Today's one card (option B): the score, the start of the day or the
+/// invitation to plan on top, and the week as one row under a line. It
+/// replaced two stacked cards that left the lanes too little room.
+class DayCard extends StatelessWidget {
+  const DayCard({super.key, required this.top, this.week});
+
+  final Widget top;
+
+  /// The week row, or null when the week has no plan.
+  final Widget? week;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = week;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            top,
+            if (w != null) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Divider(),
+              ),
+              w,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

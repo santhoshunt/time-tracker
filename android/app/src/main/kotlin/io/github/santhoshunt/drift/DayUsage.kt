@@ -99,7 +99,13 @@ object DaySessionizer {
 object DayUsage {
     const val DRIFT_PACKAGE = "io.github.santhoshunt.drift"
 
-    data class Counted(val totalMs: Long, val distractingMs: Long)
+    /** [distractingByApp] splits [distractingMs] by package, for the apps
+     * the expanded notification lists. */
+    data class Counted(
+        val totalMs: Long,
+        val distractingMs: Long,
+        val distractingByApp: Map<String, Long> = emptyMap(),
+    )
 
     /** An off-track rule for any block makes an app distracting; otherwise
      * a guessed-off category does, unless an on-track rule claims it. */
@@ -127,6 +133,7 @@ object DayUsage {
     ): Counted {
         var total = 0L
         var distracting = 0L
+        val byApp = HashMap<String, Long>()
         for (s in DaySessionizer.sessions(events, idle, nowMs)) {
             if (s.pkg == DRIFT_PACKAGE) continue
             if (launchable.isNotEmpty() && s.pkg !in launchable) continue
@@ -136,8 +143,9 @@ object DayUsage {
             total += to - from
             if (isDistracting(s.pkg, categoryOf(s.pkg), offApps, onApps, guessOff)) {
                 distracting += to - from
+                byApp[s.pkg] = (byApp[s.pkg] ?: 0L) + (to - from)
             }
         }
-        return Counted(total, distracting)
+        return Counted(total, distracting, byApp)
     }
 }

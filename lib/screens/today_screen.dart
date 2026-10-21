@@ -146,16 +146,18 @@ class _TodayScreenState extends State<TodayScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const UpdateBanner(),
-          if (firstAhead != null)
-            DayStartStrip(first: firstAhead)
-          else
-            ScoreCard(score: data?.score, onPlan: widget.onPlan),
-          if (week != null && week.hasPlan)
-            WeekCard(
-              progress: week,
-              target: settings.weeklyTarget,
-              today: DateTime(now.year, now.month, now.day),
-            ),
+          DayCard(
+            top: firstAhead != null
+                ? DayStartStrip(first: firstAhead)
+                : ScoreSummary(score: data?.score, onPlan: widget.onPlan),
+            week: week != null && week.hasPlan
+                ? WeekRow(
+                    progress: week,
+                    target: settings.weeklyTarget,
+                    today: DateTime(now.year, now.month, now.day),
+                  )
+                : null,
+          ),
         ],
       ),
     );
@@ -174,7 +176,7 @@ class _TodayScreenState extends State<TodayScreen> {
               children: [
                 header,
                 top,
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
