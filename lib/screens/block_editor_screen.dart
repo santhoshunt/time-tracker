@@ -117,6 +117,10 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
   final _allowed = <String>{};
   final _offTrack = <String>{};
 
+  /// Apps answered Neutral for this block. The editor has no list for
+  /// them; it keeps them so a save or a rename does not drop them.
+  final _neutral = <String>{};
+
   /// The rules stored for the block's name when the editor opened. Saving
   /// writes only the difference, and a rename moves exactly these.
   Map<String, Verdict> _initialRules = const {};
@@ -183,7 +187,14 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
       _initialGroups = linked;
       _initialRules = initial;
       for (final MapEntry(key: p, :value) in initial.entries) {
-        (value == Verdict.onTrack ? _allowed : _offTrack).add(p);
+        switch (value) {
+          case Verdict.onTrack:
+            _allowed.add(p);
+          case Verdict.neutral:
+            _neutral.add(p);
+          case _:
+            _offTrack.add(p);
+        }
       }
       for (final MapEntry(key: id, :value) in linked.entries) {
         (value == Verdict.onTrack ? _allowedGroups : _offGroups).add(id);
@@ -329,7 +340,10 @@ class _BlockEditorScreenState extends State<BlockEditorScreen> {
     final rules = _services.rules;
     final now = _services.clock.now();
     final newName = _name.text.trim();
+    // Neutral first, so an app since added to a list takes that list's
+    // verdict instead.
     final desired = <String, Verdict>{
+      for (final p in _neutral) p: Verdict.neutral,
       for (final p in _allowed) p: Verdict.onTrack,
       for (final p in _offTrack) p: Verdict.offTrack,
     };

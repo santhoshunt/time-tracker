@@ -84,6 +84,17 @@ void main() {
     expect((await s.rules.allRules())[('focus', 'com.example.video')], Verdict.offTrack);
   });
 
+  testWidgets('a save keeps the neutral answers the editor has no list for', (tester) async {
+    await s.rules.upsertRule('Focus', 'com.example.chat', Verdict.neutral, testNow);
+    // A rename on every day goes through the same write as a plain save,
+    // and moves the neutral answer with the block.
+    await rename(tester, 'Deep work', everyDay: true);
+    final rules = await s.rules.allRules();
+    expect(rules[('deep work', 'com.example.chat')], Verdict.neutral);
+    expect(rules[('deep work', 'com.example.video')], Verdict.offTrack);
+    expect(rules.containsKey(('focus', 'com.example.chat')), isFalse);
+  });
+
   test('renameInFrozen changes only the block with that id and old name', () async {
     final focus = (await s.plans.allBlocks()).single;
     final other = PlanBlock(id: focus.id! + 1, name: 'Focus', startMin: 13 * 60, endMin: 14 * 60);

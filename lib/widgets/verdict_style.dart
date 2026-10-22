@@ -7,6 +7,7 @@ import '../theme/drift_theme.dart';
 Color verdictColor(DriftColors c, Verdict v) => switch (v) {
   Verdict.onTrack => c.onTrack,
   Verdict.offTrack => c.offTrack,
+  Verdict.neutral => c.neutral,
   Verdict.guessedOn || Verdict.guessedOff => c.guessed,
   Verdict.idle => c.idleFill,
   Verdict.unplanned => c.textSecondary.withValues(alpha: 0.35),
@@ -17,6 +18,7 @@ Color verdictColor(DriftColors c, Verdict v) => switch (v) {
 String verdictLabel(Verdict v) => switch (v) {
   Verdict.onTrack => 'On track',
   Verdict.offTrack => 'Off track',
+  Verdict.neutral => 'Neutral',
   Verdict.guessedOn => 'Guessed on track',
   Verdict.guessedOff => 'Guessed off track',
   Verdict.idle => 'Idle',

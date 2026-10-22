@@ -5,8 +5,9 @@ import '../../domain/models.dart';
 /// Learned (block, app) rules and one-off session overrides: the user's
 /// answers to "was this on track?".
 ///
-/// Only [Verdict.onTrack] and [Verdict.offTrack] are stored, as 'on' and
-/// 'off'; the other verdicts are computed, never answered.
+/// Only the answers are stored: [Verdict.onTrack], [Verdict.offTrack] and
+/// [Verdict.neutral], as 'on', 'off' and 'neutral'. The other verdicts are
+/// computed, never answered. An older Drift reads 'neutral' as no answer.
 class RuleRepository {
   RuleRepository(this.db);
 
@@ -80,12 +81,14 @@ class RuleRepository {
   static String _toDb(Verdict v) => switch (v) {
         Verdict.onTrack => 'on',
         Verdict.offTrack => 'off',
-        _ => throw ArgumentError.value(v, 'verdict', 'only onTrack or offTrack can be stored'),
+        Verdict.neutral => 'neutral',
+        _ => throw ArgumentError.value(v, 'verdict', 'only onTrack, offTrack or neutral can be stored'),
       };
 
   static Verdict? _fromDb(String? s) => switch (s) {
         'on' => Verdict.onTrack,
         'off' => Verdict.offTrack,
+        'neutral' => Verdict.neutral,
         _ => null,
       };
 }

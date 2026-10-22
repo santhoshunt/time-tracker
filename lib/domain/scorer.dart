@@ -51,6 +51,7 @@ DayScore? scoreDay(List<Segment> segments, List<ResolvedBlock> blocks, DateTime 
       case Verdict.noData:
         noDataMs += ms;
       case Verdict.onTrack:
+      case Verdict.neutral:
       case Verdict.guessedOn:
       case Verdict.unplanned:
         break;

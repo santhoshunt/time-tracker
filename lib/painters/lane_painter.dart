@@ -133,7 +133,7 @@ class LaneLayout {
       var labelOffset = Offset.zero;
       Rect? labelClip;
       if (height >= labelMinHeight && (appLabel.isNotEmpty || v == Verdict.idle)) {
-        final solid = v == Verdict.onTrack || v == Verdict.offTrack;
+        final solid = v == Verdict.onTrack || v == Verdict.offTrack || v == Verdict.neutral;
         label = TextPainter(
           text: TextSpan(
             text: v == Verdict.idle ? 'idle' : appLabel,

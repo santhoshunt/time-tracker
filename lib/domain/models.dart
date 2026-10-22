@@ -329,7 +329,11 @@ class ResolvedBlock {
 
 /// How a slice of the day went against the plan. The guessed verdicts
 /// come from the app's category and show amber until the user answers.
-enum Verdict { onTrack, offTrack, guessedOn, guessedOff, idle, unplanned, noData }
+///
+/// [neutral] is an answer: the app is fine in that block without being
+/// on track. It scores like on track but holds only for that block, so
+/// the app still counts as distracting across the day.
+enum Verdict { onTrack, offTrack, neutral, guessedOn, guessedOff, idle, unplanned, noData }
 
 /// One classified slice of a day. [p] is null for idle, unplanned idle
 /// and no-data time; [sessionId] links back to the session for asks.

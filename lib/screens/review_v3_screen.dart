@@ -935,6 +935,9 @@ class _DayView extends StatelessWidget {
                 ReviewLegend(
                   items: [
                     LegendItem('On track', c.onTrack),
+                    // Only on a day that has some, as few answers are neutral.
+                    if (day.segments.any((s) => s.verdict == Verdict.neutral))
+                      LegendItem('Neutral', c.neutral),
                     LegendItem('Idle', c.idleFill),
                     LegendItem('Off track', c.offTrack),
                     LegendItem('Not reached', c.line),
@@ -962,7 +965,7 @@ class _BlockBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
-    var on = 0, idle = 0, off = 0;
+    var on = 0, neutral = 0, idle = 0, off = 0;
     for (final s in data.segments) {
       if (s.blockName != block.name) continue;
       if (!s.end.isAfter(block.start) || !s.start.isBefore(block.end)) continue;
@@ -976,6 +979,8 @@ class _BlockBar extends StatelessWidget {
           idle += secs;
         case Verdict.onTrack || Verdict.guessedOn:
           on += secs;
+        case Verdict.neutral:
+          neutral += secs;
         case Verdict.unplanned || Verdict.noData:
           break;
       }
@@ -983,7 +988,8 @@ class _BlockBar extends StatelessWidget {
     final planned = block.end.difference(block.start).inSeconds;
     final total = planned == 0 ? 1 : planned;
     int flex(int v) => (v * 1000 ~/ total).clamp(0, 1000);
-    final rest = (1000 - flex(on) - flex(idle) - flex(off)).clamp(0, 1000);
+    final rest =
+        (1000 - flex(on) - flex(neutral) - flex(idle) - flex(off)).clamp(0, 1000);
     final time = DateFormat('HH:mm');
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1032,6 +1038,8 @@ class _BlockBar extends StatelessWidget {
                 children: [
                   if (flex(on) > 0)
                     Expanded(flex: flex(on), child: ColoredBox(color: c.onTrack)),
+                  if (flex(neutral) > 0)
+                    Expanded(flex: flex(neutral), child: ColoredBox(color: c.neutral)),
                   if (flex(idle) > 0)
                     Expanded(flex: flex(idle), child: ColoredBox(color: c.idleFill)),
                   if (flex(off) > 0)

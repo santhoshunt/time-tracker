@@ -153,6 +153,9 @@ List<Segment> classifyFrame({
   return segments;
 }
 
+/// The verdicts a user can give; anything else stored is ignored.
+const _answers = {Verdict.onTrack, Verdict.offTrack, Verdict.neutral};
+
 Verdict _judge(
   Session session,
   ResolvedBlock block,
@@ -163,10 +166,10 @@ Verdict _judge(
 ) {
   final id = session.id;
   final override = id == null ? null : overrides[id];
-  if (override == Verdict.onTrack || override == Verdict.offTrack) return override!;
+  if (override != null && _answers.contains(override)) return override;
   final key = blockKey(block.name);
   final rule = rules[(key, session.p)];
-  if (rule == Verdict.onTrack || rule == Verdict.offTrack) return rule!;
+  if (rule != null && _answers.contains(rule)) return rule;
   final grouped = groups.blockVerdict(key, session.p);
   if (grouped != null) return grouped;
   if (block.anyApp) return Verdict.onTrack;

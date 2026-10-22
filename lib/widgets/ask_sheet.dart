@@ -9,6 +9,7 @@ import '../platform/usage_source.dart';
 import '../screens/block_editor_screen.dart';
 import '../services/day_loader.dart';
 import '../theme/drift_theme.dart';
+import 'verdict_style.dart';
 
 /// Launcher icons by package for the ask sheet and the Learned rules list,
 /// kept for the life of the process so Android is asked once per app.
@@ -54,7 +55,7 @@ String guessLine(Verdict guess, String category) {
 class AskAnswer {
   const AskAnswer({required this.verdict, required this.remember});
 
-  /// [Verdict.onTrack] or [Verdict.offTrack].
+  /// [Verdict.onTrack], [Verdict.neutral] or [Verdict.offTrack].
   final Verdict verdict;
 
   /// True writes a rule for every block with this name; false writes an
@@ -157,8 +158,8 @@ Future<bool> showAskSheet(
 }
 
 /// Ask option A: "WhatsApp during Deep work?" with the time it was used,
-/// the category guess, On track and Off track, and "Remember for every
-/// Deep work", checked by default. Pops with an [AskAnswer].
+/// the category guess, On track, Neutral and Off track, and "Remember for
+/// every Deep work", checked by default. Pops with an [AskAnswer].
 class AskSheet extends StatefulWidget {
   const AskSheet({
     super.key,
@@ -259,25 +260,23 @@ class _AskSheetState extends State<AskSheet> {
             ),
           ),
           const SizedBox(height: 16),
+          // Three answers in words only: icons would not leave them room
+          // on a narrow phone.
           Row(
             children: [
-              Expanded(
-                child: _VerdictButton(
-                  label: 'On track',
-                  icon: Icons.check_circle_outline,
-                  color: c.onTrack,
-                  onPressed: _answered ? null : () => _answer(Verdict.onTrack),
+              for (final (i, v) in const [
+                Verdict.onTrack,
+                Verdict.neutral,
+                Verdict.offTrack,
+              ].indexed) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: _VerdictButton(
+                    verdict: v,
+                    onPressed: _answered ? null : () => _answer(v),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _VerdictButton(
-                  label: 'Off track',
-                  icon: Icons.do_not_disturb_on_outlined,
-                  color: c.offTrack,
-                  onPressed: _answered ? null : () => _answer(Verdict.offTrack),
-                ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -335,31 +334,30 @@ class _AskSheetState extends State<AskSheet> {
   }
 }
 
+/// An answer with its edge in the verdict colour and its words in the text
+/// colour.
 class _VerdictButton extends StatelessWidget {
-  const _VerdictButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onPressed,
-  });
+  const _VerdictButton({required this.verdict, required this.onPressed});
 
-  final String label;
-  final IconData icon;
-  final Color color;
+  final Verdict verdict;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final c = context.drift;
-    return OutlinedButton.icon(
+    final color = verdictColor(c, verdict);
+    return OutlinedButton(
       style: OutlinedButton.styleFrom(
         foregroundColor: c.text,
         side: BorderSide(color: color.withValues(alpha: 0.7), width: 1.5),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
       ),
       onPressed: onPressed,
-      icon: Icon(icon, size: 20, color: color),
-      label: Text(label, maxLines: 1, softWrap: false),
+      // Scales down rather than clipping with large text.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(verdictLabel(verdict), maxLines: 1, softWrap: false),
+      ),
     );
   }
 }

@@ -116,6 +116,16 @@ void main() {
     expect(bumps, 1);
   });
 
+  testWidgets('Neutral writes a neutral rule for the block', (tester) async {
+    final day = await loadDay(s, testNow);
+    await pumpQueue(tester, day);
+
+    expect(find.widgetWithText(OutlinedButton, 'Neutral'), findsOneWidget);
+    await tapAnswer(tester, 'Neutral');
+
+    expect((await s.rules.allRules())[('gym', 'com.example.music')], Verdict.neutral);
+  });
+
   testWidgets('unchecked writes overrides for every matching session and no rule', (tester) async {
     await _replaceSessions(s, [
       ..._sampleSessions(),

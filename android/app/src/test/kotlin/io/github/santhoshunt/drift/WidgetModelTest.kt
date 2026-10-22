@@ -490,6 +490,8 @@ class WidgetModelTest {
         val c = WidgetColors()
         assertEquals(c.onTrack, WidgetModel.verdictFill(c, WidgetVerdict.ON_TRACK))
         assertEquals(c.offTrack, WidgetModel.verdictFill(c, WidgetVerdict.OFF_TRACK))
+        assertEquals(c.textSecondary, WidgetModel.verdictFill(c, WidgetVerdict.NEUTRAL))
+        assertEquals(WidgetVerdict.NEUTRAL, WidgetVerdict.fromWire("neutral"))
         assertEquals(0x47F5B544, WidgetModel.verdictFill(c, WidgetVerdict.GUESSED_OFF))
         assertEquals(0x383DD68C, WidgetModel.verdictFill(c, WidgetVerdict.IDLE))
         assertEquals(0x59AAB8D4, WidgetModel.verdictFill(c, WidgetVerdict.UNPLANNED))

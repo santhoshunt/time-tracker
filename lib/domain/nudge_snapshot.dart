@@ -145,7 +145,9 @@ class NudgeSnapshot {
 
 /// The apps the distracting-time count treats specially, from the learned
 /// rules: (always distracting, never distracting). An off-track rule for
-/// any block wins over an on-track rule for another.
+/// any block wins over an on-track rule for another. A neutral rule holds
+/// only in its block, so it leaves an app's standing for the day alone:
+/// Instagram neutral in Lunch still counts as distracting.
 ///
 /// With [groups]: a Distracting group's apps are always distracting, and a
 /// Productive group's apps are never, unless a rule or a Distracting group
@@ -267,7 +269,8 @@ List<NudgeWindow> nudgeWindows({
   final byKey = <String, (Set<String>, Set<String>)>{};
   for (final MapEntry(key: (key, p), :value) in rules.entries) {
     final sets = byKey.putIfAbsent(key, () => (<String>{}, <String>{}));
-    if (value == Verdict.onTrack) sets.$1.add(p);
+    // Neutral is fine in this block, so it never nudges or locks here.
+    if (value == Verdict.onTrack || value == Verdict.neutral) sets.$1.add(p);
     if (value == Verdict.offTrack) sets.$2.add(p);
   }
   final distracting = groups.distractingApps;

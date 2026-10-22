@@ -2,6 +2,7 @@ import 'package:drift_time/app_services.dart';
 import 'package:drift_time/domain/models.dart';
 import 'package:drift_time/providers/settings_provider.dart';
 import 'package:drift_time/screens/rules_screen.dart';
+import 'package:drift_time/widgets/verdict_style.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -33,7 +34,7 @@ void main() {
     final tags = find.descendant(
       of: row,
       matching: find.byWidgetPredicate(
-        (w) => w is Text && (w.data == 'On track' || w.data == 'Off track'),
+        (w) => w is Text && const {'On track', 'Neutral', 'Off track'}.contains(w.data),
       ),
     );
     return (tester.widget<Text>(tags).data)!;
@@ -63,22 +64,24 @@ void main() {
     expect(tagOf(tester, 'Zoom'), 'On track');
   });
 
-  testWidgets('tapping a row switches it between on and off track', (tester) async {
+  testWidgets('tapping a row moves it through on track, neutral and off track', (tester) async {
     await seedSampleDay(s, testNow);
     var bumps = 0;
     s.revision.addListener(() => bumps++);
     await pumpRules(tester);
 
-    await tester.tap(find.text('YouTube'));
-    await tester.pumpAndSettle();
-    expect(tagOf(tester, 'YouTube'), 'On track');
-    expect((await s.rules.allRules())[('deep work', 'com.example.video')], Verdict.onTrack);
-
-    await tester.tap(find.text('YouTube'));
-    await tester.pumpAndSettle();
-    expect(tagOf(tester, 'YouTube'), 'Off track');
-    expect((await s.rules.allRules())[('deep work', 'com.example.video')], Verdict.offTrack);
-    expect(bumps, 2);
+    // YouTube starts off track in Deep work.
+    for (final (tag, verdict) in const [
+      ('On track', Verdict.onTrack),
+      ('Neutral', Verdict.neutral),
+      ('Off track', Verdict.offTrack),
+    ]) {
+      await tester.tap(find.text('YouTube'));
+      await tester.pumpAndSettle();
+      expect(tagOf(tester, 'YouTube'), tag);
+      expect((await s.rules.allRules())[('deep work', 'com.example.video')], verdict);
+    }
+    expect(bumps, 3);
   });
 
   testWidgets('swiping forgets a rule and Undo restores it', (tester) async {
@@ -124,6 +127,10 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    /// The answer called [label] in [row].
+    Finder answer(Finder row, String label) =>
+        find.descendant(of: row, matching: find.widgetWithText(OutlinedButton, label));
+
     /// Friday 16 October, a weekday with the same blocks: WhatsApp again in
     /// Deep work (a pair today also has) and Spotify in Deep work (a pair
     /// only this day has).
@@ -150,7 +157,7 @@ void main() {
       expect(find.text('Not sorted (2)'), findsOneWidget);
     });
 
-    testWidgets('a tick writes an on rule, removes the row and lists it under Sorted', (tester) async {
+    testWidgets('On track writes an on rule, removes the row and lists it under Sorted', (tester) async {
       await seedSampleDay(s, testNow);
       var bumps = 0;
       s.revision.addListener(() => bumps++);
@@ -159,7 +166,15 @@ void main() {
 
       final row = unsortedRow('deep work', 'com.example.chat');
       expect(find.descendant(of: row, matching: find.text('Guessed off track')), findsOneWidget);
-      await tester.tap(find.descendant(of: row, matching: find.byTooltip('On track')));
+      // The guess, off track, is the dashed answer.
+      bool dashed(String label) => find
+          .ancestor(of: answer(row, label), matching: find.byType(CustomPaint))
+          .evaluate()
+          .any((e) => (e.widget as CustomPaint).foregroundPainter is DashedBorderPainter);
+      expect(dashed('Off track'), isTrue);
+      expect(dashed('On track'), isFalse);
+      expect(dashed('Neutral'), isFalse);
+      await tester.tap(answer(row, 'On track'));
       await tester.pumpAndSettle();
 
       expect((await s.rules.allRules())[('deep work', 'com.example.chat')], Verdict.onTrack);
@@ -173,19 +188,34 @@ void main() {
       expect(tagOf(tester, 'WhatsApp'), 'On track');
     });
 
-    testWidgets('a cross writes an off rule', (tester) async {
+    testWidgets('Off track writes an off rule', (tester) async {
       await seedSampleDay(s, testNow);
       await pumpRules(tester);
       await openNotSorted(tester);
 
       final row = unsortedRow('gym', 'com.example.music');
-      await tester.tap(find.descendant(of: row, matching: find.byTooltip('Off track')));
+      await tester.tap(answer(row, 'Off track'));
       await tester.pumpAndSettle();
 
       expect((await s.rules.allRules())[('gym', 'com.example.music')], Verdict.offTrack);
       expect(row, findsNothing);
       expect(find.text('Spotify counts as off track in Gym'), findsOneWidget);
       expect(find.text('Not sorted (1)'), findsOneWidget);
+    });
+
+    testWidgets('Neutral writes a neutral rule that Sorted tags grey', (tester) async {
+      await seedSampleDay(s, testNow);
+      await pumpRules(tester);
+      await openNotSorted(tester);
+
+      await tester.tap(answer(unsortedRow('deep work', 'com.example.chat'), 'Neutral'));
+      await tester.pumpAndSettle();
+
+      expect((await s.rules.allRules())[('deep work', 'com.example.chat')], Verdict.neutral);
+      expect(find.text('WhatsApp counts as neutral in Deep work'), findsOneWidget);
+      await tester.tap(find.text('Sorted'));
+      await tester.pumpAndSettle();
+      expect(tagOf(tester, 'WhatsApp'), 'Neutral');
     });
 
     testWidgets('a pair used on several days shows once, under its block, newest first', (
@@ -223,12 +253,7 @@ void main() {
       expect(s.toSort.value, 3);
 
       await openNotSorted(tester);
-      await tester.tap(
-        find.descendant(
-          of: unsortedRow('gym', 'com.example.music'),
-          matching: find.byTooltip('Off track'),
-        ),
-      );
+      await tester.tap(answer(unsortedRow('gym', 'com.example.music'), 'Off track'));
       await tester.pumpAndSettle();
       expect(s.toSort.value, 2);
     });

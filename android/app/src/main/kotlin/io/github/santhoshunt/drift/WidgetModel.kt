@@ -59,6 +59,7 @@ data class WidgetColors(
 enum class WidgetVerdict(val wire: String) {
     ON_TRACK("onTrack"),
     OFF_TRACK("offTrack"),
+    NEUTRAL("neutral"),
     GUESSED_ON("guessedOn"),
     GUESSED_OFF("guessedOff"),
     IDLE("idle"),
@@ -400,6 +401,7 @@ object WidgetModel {
     fun verdictFill(c: WidgetColors, v: WidgetVerdict): Int = when (v) {
         WidgetVerdict.ON_TRACK -> c.onTrack
         WidgetVerdict.OFF_TRACK -> c.offTrack
+        WidgetVerdict.NEUTRAL -> c.textSecondary
         WidgetVerdict.GUESSED_ON, WidgetVerdict.GUESSED_OFF -> WidgetColors.withAlpha(c.guessed, 0.28)
         WidgetVerdict.IDLE -> WidgetColors.withAlpha(c.onTrack, 0.22)
         WidgetVerdict.UNPLANNED -> WidgetColors.withAlpha(c.textSecondary, 0.35)

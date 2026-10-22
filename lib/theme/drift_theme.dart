@@ -110,6 +110,11 @@ class DriftColors extends ThemeExtension<DriftColors> {
   /// colour at low strength.
   Color get idleFill => onTrack.withValues(alpha: 0.22);
 
+  /// Time on an app answered Neutral: fine in that block, neither on nor
+  /// off track, so grey. Solid, unlike the faint grey of time outside the
+  /// plan, and dark enough under a [bg] label in every theme.
+  Color get neutral => textSecondary;
+
   /// The fill of a plan block, as in the mockups.
   Color get planFill => accent.withValues(alpha: 0.13);
 

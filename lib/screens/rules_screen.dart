@@ -37,11 +37,11 @@ class _Group {
 }
 
 /// Learned rules option B: two tabs. Sorted is option A, every (block,
-/// app) answer grouped by block with an On track or Off track tag; tap a
-/// row to switch it, swipe it to forget it (with Undo). Not sorted lists
-/// the apps used in a block over the last 14 days that have only a guess,
-/// under the same block headings, each with a tick and a cross that store
-/// the answer.
+/// app) answer grouped by block with an On track, Neutral or Off track
+/// tag; tap a row to move it to the next answer, swipe it to forget it
+/// (with Undo). Not sorted lists the apps used in a block over the last 14
+/// days that have only a guess, under the same block headings, each with
+/// the three answers (option C) and Drift's guess drawn dashed.
 class RulesScreen extends StatefulWidget {
   const RulesScreen({super.key});
 
@@ -130,10 +130,13 @@ class _RulesScreenState extends State<RulesScreen> {
   static String _capitalised(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
+  /// On track, then Neutral, then Off track, then round again.
   Future<void> _flip(_Rule r) async {
-    final next = r.verdict == Verdict.onTrack
-        ? Verdict.offTrack
-        : Verdict.onTrack;
+    final next = switch (r.verdict) {
+      Verdict.onTrack => Verdict.neutral,
+      Verdict.neutral => Verdict.offTrack,
+      _ => Verdict.onTrack,
+    };
     setState(() => r.verdict = next);
     await _services.rules.upsertRule(r.key, r.p, next, _services.clock.now());
     _services.bump();
@@ -191,12 +194,15 @@ class _RulesScreenState extends State<RulesScreen> {
       _pending.remove(u.id);
     }
     _services.bump();
-    final on = verdict == Verdict.onTrack;
     showAppToastOn(
       messenger,
-      '${u.label} counts as ${on ? 'on' : 'off'} track in ${u.blockName}',
-      tone: on ? AppToastTone.success : AppToastTone.change,
-      icon: on ? Icons.check : Icons.close,
+      '${u.label} counts as ${verdictLabel(verdict).toLowerCase()} in ${u.blockName}',
+      tone: verdict == Verdict.onTrack ? AppToastTone.success : AppToastTone.change,
+      icon: switch (verdict) {
+        Verdict.onTrack => Icons.check,
+        Verdict.neutral => Icons.remove,
+        _ => Icons.close,
+      },
     );
   }
 
@@ -265,8 +271,9 @@ class _RulesScreenState extends State<RulesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
             'Apps used in a block over the last $unsortedDays days that '
-            'Drift has only guessed about. Tick if the app fits the block, '
-            'cross if it does not.',
+            'Drift has only guessed about. Pick what each counts as in its '
+            "block; the dashed answer is Drift's guess. Neutral is fine in "
+            'that block but leaves the app distracting for the rest of the day.',
             style: text.bodySmall?.copyWith(color: c.textSecondary),
           ),
         ),
@@ -310,8 +317,8 @@ class _RulesScreenState extends State<RulesScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              'Tap an app to switch between on and off track. '
-              'Swipe to forget it.',
+              'Tap an app to move it between on track, neutral and off '
+              'track. Swipe to forget it.',
               style: text.bodySmall?.copyWith(color: c.textSecondary),
             ),
           ),
@@ -368,8 +375,10 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// One guessed pair under its block's heading: the app, "Guessed on track"
-/// or "Guessed off track", and a tick and a cross in the verdict colours.
+/// One guessed pair under its block's heading (option C): the app and
+/// "Guessed on track" or "Guessed off track", with On track, Neutral and
+/// Off track on a line of their own under it. The guessed answer has a
+/// dashed edge.
 class _UnsortedRow extends StatelessWidget {
   const _UnsortedRow({
     super.key,
@@ -386,92 +395,127 @@ class _UnsortedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.drift;
     final text = Theme.of(context).textTheme;
-    final guess = item.guess == Verdict.guessedOff
-        ? 'Guessed off track'
-        : 'Guessed on track';
+    final guessedOff = item.guess == Verdict.guessedOff;
     return Material(
       color: c.card,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 64),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 10, 8),
-          child: Row(
-            children: [
-              AppIcon(
-                package: item.p,
-                label: item.label,
-                size: 32,
-                iconFor: (p) => cachedAppIcon(services, p),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      item.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodyLarge?.copyWith(color: c.text),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      guess,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(color: c.textSecondary),
-                    ),
-                  ],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppIcon(
+                  package: item.p,
+                  label: item.label,
+                  size: 32,
+                  iconFor: (p) => cachedAppIcon(services, p),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodyLarge?.copyWith(color: c.text),
+                      ),
+                      Text(
+                        guessedOff ? 'Guessed off track' : 'Guessed on track',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodySmall?.copyWith(color: c.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Under the name, lined up with it, so three answers fit a
+            // narrow phone; they wrap rather than overflow with large text.
+            Padding(
+              padding: const EdgeInsets.only(left: 44),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _AnswerPill(
+                    verdict: Verdict.onTrack,
+                    guessed: !guessedOff,
+                    onPressed: () => onAnswer(Verdict.onTrack),
+                  ),
+                  _AnswerPill(
+                    verdict: Verdict.neutral,
+                    guessed: false,
+                    onPressed: () => onAnswer(Verdict.neutral),
+                  ),
+                  _AnswerPill(
+                    verdict: Verdict.offTrack,
+                    guessed: guessedOff,
+                    onPressed: () => onAnswer(Verdict.offTrack),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              _AnswerButton(
-                tooltip: 'On track',
-                icon: Icons.check,
-                color: c.onTrack,
-                onPressed: () => onAnswer(Verdict.onTrack),
-              ),
-              const SizedBox(width: 6),
-              _AnswerButton(
-                tooltip: 'Off track',
-                icon: Icons.close,
-                color: c.offTrack,
-                onPressed: () => onAnswer(Verdict.offTrack),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// An outlined circle on the card with the icon and edge in [color].
-class _AnswerButton extends StatelessWidget {
-  const _AnswerButton({
-    required this.tooltip,
-    required this.icon,
-    required this.color,
+/// One answer as an outlined pill: the edge in the verdict colour and the
+/// words in the text colour, never coloured text on a coloured fill. The
+/// guessed answer's edge is dashed.
+class _AnswerPill extends StatelessWidget {
+  const _AnswerPill({
+    required this.verdict,
+    required this.guessed,
     required this.onPressed,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final Color color;
+  final Verdict verdict;
+  final bool guessed;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.outlined(
-      tooltip: tooltip,
+    final c = context.drift;
+    final color = verdictColor(c, verdict);
+    final label = verdictLabel(verdict);
+    final button = OutlinedButton(
       onPressed: onPressed,
-      style: IconButton.styleFrom(
-        foregroundColor: color,
-        backgroundColor: context.drift.card,
-        side: BorderSide(color: color.withValues(alpha: 0.7), width: 1.5),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: c.text,
+        backgroundColor: c.card,
+        minimumSize: const Size(0, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        visualDensity: VisualDensity.compact,
+        // The dashed edge is painted around the widget's own box, so the
+        // box must be the pill, without the extra tap margin.
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+        side: guessed
+            ? BorderSide.none
+            : BorderSide(color: color.withValues(alpha: 0.8), width: 1.5),
       ),
-      icon: Icon(icon, size: 20, color: color),
+      child: Text(label),
+    );
+    return Semantics(
+      label: guessed ? "$label, Drift's guess" : label,
+      excludeSemantics: true,
+      button: true,
+      onTap: onPressed,
+      child: guessed
+          ? CustomPaint(
+              foregroundPainter: DashedBorderPainter(color: color, radius: 18),
+              child: button,
+            )
+          : button,
     );
   }
 }
@@ -507,7 +551,7 @@ class _RuleRow extends StatelessWidget {
           onTap: onTap,
           child: Semantics(
             button: true,
-            hint: 'Switch between on and off track',
+            hint: 'Move between on track, neutral and off track',
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 56),
               child: Padding(

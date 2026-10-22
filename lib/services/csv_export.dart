@@ -22,6 +22,7 @@ const csvHeader = 'date,start,end,minutes,app,package,block,verdict';
 String csvVerdict(Verdict v) => switch (v) {
   Verdict.onTrack => 'on_track',
   Verdict.offTrack => 'off_track',
+  Verdict.neutral => 'neutral',
   Verdict.guessedOn => 'guessed_on_track',
   Verdict.guessedOff => 'guessed_off_track',
   Verdict.idle => 'idle',
