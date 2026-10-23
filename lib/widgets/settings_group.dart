@@ -51,6 +51,7 @@ class SettingsRow extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.leading,
+    this.badge = 0,
   });
 
   final String title;
@@ -59,6 +60,10 @@ class SettingsRow extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget? trailing;
   final Widget? leading;
+
+  /// A count above zero shows in the same badge as the Settings tab icon,
+  /// before the chevron.
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +104,11 @@ class SettingsRow extends StatelessWidget {
                     value!,
                     style: text.bodyMedium?.copyWith(color: c.textSecondary),
                   ),
+                ),
+              if (badge > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 4),
+                  child: Badge(label: Text('$badge')),
                 ),
               if (trailing != null)
                 Padding(

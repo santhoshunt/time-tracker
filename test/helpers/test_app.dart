@@ -8,6 +8,7 @@ import 'package:drift_time/services/drive_backup_service.dart';
 import 'package:drift_time/theme/drift_theme.dart';
 import 'package:drift_time/theme/theme_id.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -122,6 +123,14 @@ Widget withApp(
     ),
   ),
 );
+
+/// Taps the Settings category called [page] and waits for its page.
+Future<void> openSettingsPage(WidgetTester tester, String page) async {
+  await tester.scrollUntilVisible(find.text(page), 200);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(page));
+  await tester.pumpAndSettle();
+}
 
 /// Just the providers, for [pumpGolden], which brings its own MaterialApp.
 Widget withProviders(

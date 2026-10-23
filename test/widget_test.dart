@@ -37,7 +37,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pump();
-    expect(find.text('Live nudges'), findsOneWidget);
+    expect(find.text('Learned rules'), findsOneWidget);
     await tester.runAsync(() => services.db.close());
   });
 

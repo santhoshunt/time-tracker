@@ -153,10 +153,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(find.text('Melting clock'), 200);
+      // The category rows sum up what their pages hold.
+      expect(find.text('Mono · Melting clock'), findsOneWidget);
+      expect(find.text('v0.1.0 · updates and diagnostics'), findsOneWidget);
+
+      await openSettingsPage(tester, 'Appearance');
       expect(find.text('Mono'), findsOneWidget);
       expect(find.text('Melting clock'), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('v0.1.0'), 200);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await openSettingsPage(tester, 'About');
       expect(find.text('v0.1.0'), findsOneWidget);
     });
 
@@ -189,8 +195,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(settings.updateOnLaunch, isTrue);
-      await tester.scrollUntilVisible(find.text('Check on launch'), 200);
-      await tester.pumpAndSettle();
+      await openSettingsPage(tester, 'About');
       final row = find.ancestor(
         of: find.text('Check on launch'),
         matching: find.byType(InkWell),

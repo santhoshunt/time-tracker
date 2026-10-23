@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -61,6 +63,15 @@ class _RulesScreenState extends State<RulesScreen> {
   /// Rules being deleted, by (block key, package), for the same reason.
   final _forgetting = <(String, String)>{};
 
+  /// Tapped answers on Sorted, by (block key, package). A load that read
+  /// the database before the write landed must not show the old tag.
+  final _flips = <(String, String), Verdict>{};
+
+  /// Every bump reloads all tabs, the widget and the nudges, so answers
+  /// bump once the taps stop rather than once per tap.
+  Timer? _bumpTimer;
+  Future<void> _writes = Future.value();
+
   /// Counts loads, so only the newest one is applied.
   int _generation = 0;
 
@@ -75,7 +86,23 @@ class _RulesScreenState extends State<RulesScreen> {
   @override
   void dispose() {
     _services.revision.removeListener(_load);
+    if (_bumpTimer?.isActive ?? false) {
+      _bumpTimer!.cancel();
+      _writes.then((_) => _services.bump());
+    }
     super.dispose();
+  }
+
+  void _bumpSoon() {
+    _bumpTimer?.cancel();
+    _bumpTimer = Timer(const Duration(milliseconds: 500), () async {
+      await _writes;
+      // A tap after the timer fired starts its own timer and bumps then.
+      // Leaving the screen meanwhile still bumps: the services outlive it.
+      if (_bumpTimer?.isActive ?? false) return;
+      _flips.clear();
+      _services.bump();
+    });
   }
 
   Future<void> _load() async {
@@ -87,6 +114,9 @@ class _RulesScreenState extends State<RulesScreen> {
       // A rule being forgotten stays gone even if this load read it first.
       for (final g in groups) {
         g.rules.removeWhere((r) => _forgetting.contains((r.key, r.p)));
+        for (final r in g.rules) {
+          r.verdict = _flips[(r.key, r.p)] ?? r.verdict;
+        }
       }
       groups.removeWhere((g) => g.rules.isEmpty);
       _groups = groups;
@@ -138,8 +168,14 @@ class _RulesScreenState extends State<RulesScreen> {
       _ => Verdict.onTrack,
     };
     setState(() => r.verdict = next);
-    await _services.rules.upsertRule(r.key, r.p, next, _services.clock.now());
-    _services.bump();
+    _flips[(r.key, r.p)] = next;
+    // One failed write must not stop the later ones or the bump.
+    _writes = _writes.then(
+      (_) => _services.rules
+          .upsertRule(r.key, r.p, next, _services.clock.now())
+          .catchError((Object _) {}),
+    );
+    _bumpSoon();
   }
 
   Future<void> _forget(_Group g, _Rule r) async {
@@ -193,7 +229,7 @@ class _RulesScreenState extends State<RulesScreen> {
     } finally {
       _pending.remove(u.id);
     }
-    _services.bump();
+    _bumpSoon();
     showAppToastOn(
       messenger,
       '${u.label} counts as ${verdictLabel(verdict).toLowerCase()} in ${u.blockName}',

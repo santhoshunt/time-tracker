@@ -79,9 +79,34 @@ void main() {
       await tester.tap(find.text('YouTube'));
       await tester.pumpAndSettle();
       expect(tagOf(tester, 'YouTube'), tag);
+      await tester.pump(const Duration(milliseconds: 500));
       expect((await s.rules.allRules())[('deep work', 'com.example.video')], verdict);
     }
     expect(bumps, 3);
+  });
+
+  testWidgets('quick taps bump once, after the last, and the tag never steps back', (tester) async {
+    await seedSampleDay(s, testNow);
+    var bumps = 0;
+    s.revision.addListener(() => bumps++);
+    await pumpRules(tester);
+
+    for (final tag in const ['On track', 'Neutral', 'Off track', 'On track']) {
+      // A load from elsewhere reads the rules just before the tap writes,
+      // and lands after it; the tag keeps the tapped answer.
+      s.bump();
+      bumps--;
+      await tester.tap(find.text('YouTube'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tagOf(tester, 'YouTube'), tag);
+    }
+    expect(bumps, 0);
+
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(bumps, 1);
+    expect(tagOf(tester, 'YouTube'), 'On track');
+    expect((await s.rules.allRules())[('deep work', 'com.example.video')], Verdict.onTrack);
   });
 
   testWidgets('swiping forgets a rule and Undo restores it', (tester) async {
@@ -176,6 +201,7 @@ void main() {
       expect(dashed('Neutral'), isFalse);
       await tester.tap(answer(row, 'On track'));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect((await s.rules.allRules())[('deep work', 'com.example.chat')], Verdict.onTrack);
       expect(bumps, 1);
@@ -210,6 +236,7 @@ void main() {
 
       await tester.tap(answer(unsortedRow('deep work', 'com.example.chat'), 'Neutral'));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect((await s.rules.allRules())[('deep work', 'com.example.chat')], Verdict.neutral);
       expect(find.text('WhatsApp counts as neutral in Deep work'), findsOneWidget);

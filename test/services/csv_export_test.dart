@@ -62,8 +62,7 @@ void main() {
     await seedSampleDay(s, testNow);
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Export to CSV'), 200);
-    await tester.pumpAndSettle();
+    await openSettingsPage(tester, 'Backup and data');
     await tester.tap(find.text('Export to CSV'));
     await tester.pumpAndSettle();
     expect(find.text('Saved to Downloads/Drift/drift_20261019_1330.csv'), findsOneWidget);
@@ -73,8 +72,7 @@ void main() {
     usage.saveFails = true;
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Export to CSV'), 200);
-    await tester.pumpAndSettle();
+    await openSettingsPage(tester, 'Backup and data');
     await tester.tap(find.text('Export to CSV'));
     await tester.pumpAndSettle();
     expect(find.text("Couldn't save the export. Try again."), findsOneWidget);
@@ -83,8 +81,7 @@ void main() {
   testWidgets('week start can be Sunday and survives a restart', (tester) async {
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Week starts on'), 200);
-    await tester.pumpAndSettle();
+    await openSettingsPage(tester, 'Goals and week');
     await tester.tap(find.text('Week starts on'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sunday'));

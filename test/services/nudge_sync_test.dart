@@ -163,9 +163,11 @@ void main() {
       expect(quietHoursLabel(0, 0), 'Off');
     });
 
-    testWidgets('the Nudges group hides its details when switched off', (tester) async {
+    testWidgets('the Nudges page hides its details when switched off', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();
+      expect(find.text('On, first after 5 min'), findsOneWidget);
+      await openSettingsPage(tester, 'Nudges');
       expect(find.text('First nudge after'), findsOneWidget);
       expect(find.text('22:00 to 07:00'), findsOneWidget);
 
@@ -173,21 +175,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(settings.nudgesEnabled, isFalse);
       expect(find.text('First nudge after'), findsNothing);
-      expect(find.text('Learned rules'), findsOneWidget);
+      expect(find.text('Live nudges'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Off'), findsOneWidget);
     });
 
-    testWidgets('the Learned rules row shows how many apps wait to be sorted', (tester) async {
+    testWidgets('the Learned rules row shows the to-sort badge, as the tab icon does', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();
-      expect(find.textContaining('to sort'), findsNothing);
+      Finder badge() => find.descendant(
+        of: find.ancestor(of: find.text('Learned rules'), matching: find.byType(InkWell)),
+        matching: find.byType(Badge),
+      );
+      expect(badge(), findsNothing);
       s.toSort.value = 3;
       await tester.pump();
-      expect(find.text('3 to sort'), findsOneWidget);
+      expect(badge(), findsOneWidget);
+      expect(find.descendant(of: badge(), matching: find.text('3')), findsOneWidget);
+      // Learned rules and App groups sit on the root, above the categories.
+      expect(
+        tester.getTopLeft(find.text('App groups')).dy,
+        lessThan(tester.getTopLeft(find.text('Nudges')).dy),
+      );
     });
 
     testWidgets('picking a new threshold saves it', (tester) async {
       await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
       await tester.pumpAndSettle();
+      await openSettingsPage(tester, 'Nudges');
       await tester.tap(find.text('First nudge after'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('10 min'));

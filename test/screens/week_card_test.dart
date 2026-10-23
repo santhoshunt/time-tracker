@@ -104,8 +104,8 @@ void main() {
 
     testWidgets('the weekly target is picked and kept', (tester) async {
       await pumpSettings(tester);
-      await tester.scrollUntilVisible(find.text('Weekly target'), 200);
-      await tester.pumpAndSettle();
+      expect(find.text('80% weekly target · starts Monday'), findsOneWidget);
+      await openSettingsPage(tester, 'Goals and week');
       expect(find.text('80%'), findsOneWidget);
       await tester.tap(find.text('Weekly target'));
       await tester.pumpAndSettle();
@@ -121,6 +121,7 @@ void main() {
 
     testWidgets('focus lock switches on and reaches the nudge snapshot', (tester) async {
       await pumpSettings(tester);
+      await openSettingsPage(tester, 'Nudges');
       expect(find.text('Lock instead of nudge'), findsOneWidget);
       await tester.tap(find.text('Lock instead of nudge'));
       await tester.pumpAndSettle();
@@ -134,12 +135,8 @@ void main() {
 
     testWidgets('the notification switches save and reach the snapshot', (tester) async {
       await pumpSettings(tester);
-      expect(find.text('Nudges and notifications'), findsOneWidget);
+      await openSettingsPage(tester, 'Notifications');
       for (final row in ['Today in notifications', 'Block reminders']) {
-        await tester.scrollUntilVisible(find.text(row), 200);
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text(row));
-        await tester.pumpAndSettle();
         await tester.tap(find.text(row));
         await tester.pumpAndSettle();
       }
@@ -167,6 +164,7 @@ void main() {
     testWidgets('the lock row hides with live nudges off', (tester) async {
       await settings.setNudgesEnabled(false);
       await pumpSettings(tester);
+      await openSettingsPage(tester, 'Nudges');
       expect(find.text('Lock instead of nudge'), findsNothing);
     });
 

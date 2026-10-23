@@ -23,6 +23,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
+    await openSettingsPage(tester, 'Nudges');
     await tester.tap(find.text('Quiet hours'));
     await tester.pumpAndSettle();
   }
@@ -58,6 +59,7 @@ void main() {
   testWidgets('the nudge rows are named for what they do, with help lines', (tester) async {
     await tester.pumpWidget(withApp(s, settings, const SettingsScreen()));
     await tester.pumpAndSettle();
+    await openSettingsPage(tester, 'Nudges');
     expect(find.text('First nudge after'), findsOneWidget);
     expect(find.text('Nudge again after'), findsOneWidget);
     expect(find.text('15 min'), findsOneWidget);
